@@ -14,6 +14,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -217,6 +218,7 @@ public class MainActivity extends AppCompatActivity {
         String transcriptApiToken = com.studymind.app.BuildConfig.TRANSCRIPT_API_TOKEN;
         String backendUrl = com.studymind.app.BuildConfig.TRANSCRIPT_BACKEND_URL;
         String geminiApiKey = com.studymind.app.BuildConfig.GEMINI_API_KEY;
+        Log.i("StudyMind", "YouTube analysis: videoId=" + videoId + " backend=" + (backendUrl != null && !backendUrl.isEmpty()) + " transcriptApi=" + (transcriptApiToken != null && !transcriptApiToken.isEmpty()));
         YouTubeVideoAnalyzer analyzer = new YouTubeVideoAnalyzer(transcriptApiToken, backendUrl, geminiApiKey);
         analyzer.analyze(url, new YouTubeVideoAnalyzer.VideoAnalysisCallback() {
             @Override
@@ -229,7 +231,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     String transcript = result.transcript;
                     if (TextUtils.isEmpty(transcript)) {
-                        runWhisperFallbackOrPromptPaste(videoId);
+                        runWhisperFallbackOrPromptPaste(videoId, null);
                         return;
                     }
                     lastTitle = result.videoTitle != null ? result.videoTitle : "YouTube Video";
@@ -261,17 +263,23 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onError(Throwable t) {
-                runOnUiThread(() -> runWhisperFallbackOrPromptPaste(videoId));
+                runOnUiThread(() -> runWhisperFallbackOrPromptPaste(videoId, t));
             }
         });
     }
 
     /** When transcript fails: prompt user to download video themselves or paste manually. */
-    private void runWhisperFallbackOrPromptPaste(String videoId) {
+    private void runWhisperFallbackOrPromptPaste(String videoId, Throwable lastError) {
         setLoading(false, null);
+        String errMsg = lastError != null ? lastError.getMessage() : "";
+        String msg = "Could not get transcript or analyze this video.";
+        if (errMsg != null && !errMsg.isEmpty()) {
+            msg += "\n\nError: " + (errMsg.length() > 150 ? errMsg.substring(0, 150) + "…" : errMsg);
+        }
+        msg += "\n\nPlease download the video yourself and import it via Import Audio/Video, or paste the transcript below.";
         new MaterialAlertDialogBuilder(this)
                 .setTitle("No transcript available")
-                .setMessage("Could not get transcript or analyze this video.\n\nPlease download the video yourself and import it via Import Audio/Video for analysis, or paste the transcript below.")
+                .setMessage(msg)
                 .setPositiveButton("Paste transcript", (d, w) -> {
                     TextInputEditText pasteInput = findViewById(R.id.pasteInput);
                     if (pasteInput != null) pasteInput.requestFocus();

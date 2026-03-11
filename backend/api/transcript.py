@@ -107,16 +107,17 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
-        video_id = params.get("video_id", [None])[0] or params.get("videoId", [None])[0]
-        url_param = params.get("url", [None])[0]
+        video_id = (params.get("video_id") or params.get("videoId") or [None])[0]
+        url_param = (params.get("url") or [None])[0]
 
-        vid = video_id or extract_video_id(url_param) if url_param else None
+        vid = (video_id and str(video_id).strip()) or (extract_video_id(str(url_param)) if url_param else None)
         if not vid:
             self.send_response(400)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            self.wfile.write(json.dumps({"error": "Provide url= or video_id="}).encode())
+            err = {"error": "Provide url= or video_id=", "debug_path": self.path, "debug_query": parsed.query}
+            self.wfile.write(json.dumps(err).encode())
             return
 
         result = get_transcript(vid)
