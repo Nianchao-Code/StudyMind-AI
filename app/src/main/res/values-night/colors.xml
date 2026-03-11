@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="leetcode_bg">#1a1a1a</color>
+    <color name="leetcode_surface">#262626</color>
+    <color name="leetcode_card">#2d2d2d</color>
+    <color name="leetcode_primary">#00BFA5</color>
+    <color name="leetcode_success">#4ECDC4</color>
+    <color name="leetcode_text">#ffffff</color>
+    <color name="leetcode_text_secondary">#b3b3b3</color>
+    <color name="leetcode_border">#3d3d3d</color>
+</resources>

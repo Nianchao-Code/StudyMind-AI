@@ -1,0 +1,688 @@
+package com.studymind.app;
+
+import android.Manifest;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.media.MediaRecorder;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.text.TextUtils;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
+import com.studymind.app.agent.ChunkSummarizationPipeline;
+import com.studymind.app.agent.ContentAnalysisResult;
+import com.studymind.app.agent.StructuredNotes;
+import com.studymind.app.data.NoteRepository;
+import com.studymind.app.data.StudyNote;
+import com.studymind.app.pdf.PdfTextExtractor;
+import com.studymind.app.whisper.WhisperApiClient;
+import com.studymind.app.youtube.YouTubeVideoAnalyzer;
+
+public class MainActivity extends AppCompatActivity {
+
+    private ProgressBar progressBar;
+    private TextView progressText;
+    private TextView notesResult;
+    private View btnSaveNote;
+
+    private StructuredNotes lastNotes;
+    private ContentAnalysisResult lastAnalysis;
+    private NoteRepository repository;
+    private String lastTitle = "Untitled";
+    private String lastSourceType = "pasted";
+    private String lastSourceRef = "";
+    private int pipelineRequestId = 0;
+
+    private final ActivityResultLauncher<String[]> pdfPicker = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } catch (SecurityException ignored) {}
+                    processPdf(uri);
+                }
+            }
+    );
+
+    private final ActivityResultLauncher<String[]> audioPicker = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) {
+                    try {
+                        getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } catch (SecurityException ignored) {}
+                    processAudio(uri);
+                }
+            }
+    );
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        setSupportActionBar(findViewById(R.id.toolbar));
+        repository = new NoteRepository(this);
+
+        progressBar = findViewById(R.id.progressBar);
+        progressText = findViewById(R.id.progressText);
+        notesResult = findViewById(R.id.notesResult);
+        btnSaveNote = findViewById(R.id.btnSaveNote);
+        findViewById(R.id.btnDiscardNote).setOnClickListener(v -> discardNote());
+        TextInputEditText youtubeUrlInput = findViewById(R.id.youtubeUrlInput);
+        TextInputEditText pasteInput = findViewById(R.id.pasteInput);
+
+        View btnImportPdf = findViewById(R.id.btnImportPdf);
+        View btnAnalyzeYouTube = findViewById(R.id.btnAnalyzeYouTube);
+        View btnAnalyzePasted = findViewById(R.id.btnAnalyzePasted);
+
+        btnImportPdf.setOnClickListener(v -> pdfPicker.launch(new String[]{"application/pdf"}));
+        findViewById(R.id.btnRecordVoice).setOnClickListener(v -> startVoiceRecording());
+        findViewById(R.id.btnImportAudio).setOnClickListener(v -> audioPicker.launch(new String[]{
+                "audio/*", "video/*"
+        }));
+        btnAnalyzeYouTube.setOnClickListener(v -> runYouTubeAnalysis(youtubeUrlInput));
+        btnAnalyzePasted.setOnClickListener(v -> runPastedAnalysis(pasteInput));
+        findViewById(R.id.btnSaveNote).setOnClickListener(v -> saveNote());
+        findViewById(R.id.btnHistory).setOnClickListener(v ->
+                startActivity(new Intent(this, HistoryActivity.class)));
+
+        maybeShowOnboarding();
+    }
+
+    private void maybeShowOnboarding() {
+        SharedPreferences prefs = getSharedPreferences("studymind", MODE_PRIVATE);
+        if (prefs.getBoolean("onboarding_done", false)) return;
+        View onboardingView = getLayoutInflater().inflate(R.layout.dialog_onboarding, null);
+        TextView title = onboardingView.findViewById(R.id.onboardingTitle);
+        TextView subtitle = onboardingView.findViewById(R.id.onboardingSubtitle);
+        TextView points = onboardingView.findViewById(R.id.onboardingPoints);
+
+        title.setText("Welcome to StudyMind AI");
+        subtitle.setText("Turn long content into exam-ready notes");
+        points.setText("• Import PDF or paste text\n"
+                + "• Add YouTube URL to extract transcript\n"
+                + "• Record voice or import audio/video (Whisper)\n"
+                + "• Get 5 modules: definitions, concepts, formulas, pitfalls, quick review\n"
+                + "• Use History for Q&A, quiz, and flashcards");
+
+        new MaterialAlertDialogBuilder(this)
+                .setView(onboardingView)
+                .setPositiveButton("Got it", (d, w) -> prefs.edit().putBoolean("onboarding_done", true).apply())
+                .setCancelable(false)
+                .show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (recording) stopRecording();
+        super.onDestroy();
+    }
+
+    /** Used by both Import Audio/Video and Record voice. Both use transcript mode (5 sections, same as PDF). */
+    private void processAudio(Uri uri) {
+        processAudio(uri, null);
+    }
+
+    private void processAudio(Uri uri, String titleOverride) {
+        discardNote();
+        String apiKey = com.studymind.app.BuildConfig.OPENAI_API_KEY;
+        if (apiKey == null || apiKey.isEmpty()) {
+            Toast.makeText(this, "OpenAI API key required for Whisper. Add OPENAI_API_KEY to local.properties.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String fileName = uri.getLastPathSegment();
+        lastTitle = titleOverride != null ? titleOverride : (fileName != null ? fileName.replaceAll("\\.[a-zA-Z0-9]+$", "") : "Audio");
+        setLoading(true, "Transcribing with Whisper…");
+        WhisperApiClient whisper = new WhisperApiClient(apiKey);
+        whisper.transcribe(this, uri, fileName, new WhisperApiClient.TranscribeCallback() {
+            @Override
+            public void onSuccess(String transcript) {
+                runOnUiThread(() -> {
+                    if (android.text.TextUtils.isEmpty(transcript)) {
+                        setLoading(false, null);
+                        Toast.makeText(MainActivity.this, "No speech detected in file", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    lastSourceType = "whisper";
+                    lastSourceRef = uri.toString();
+                    setLoading(true, "Generating notes…");
+                    runPipeline(transcript, lastTitle, "whisper", uri.toString());
+                });
+            }
+            @Override
+            public void onError(Throwable t) {
+                runOnUiThread(() -> {
+                    setLoading(false, null);
+                    Toast.makeText(MainActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    private void processPdf(Uri uri) {
+        discardNote();
+        setLoading(true, "Extracting PDF...");
+        new Thread(() -> {
+            String text = PdfTextExtractor.extract(this, uri);
+            runOnUiThread(() -> {
+                if (TextUtils.isEmpty(text)) {
+                    setLoading(false, null);
+                    Toast.makeText(this, "Could not extract text from PDF", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                String fileName = uri.getLastPathSegment();
+                lastTitle = fileName != null ? fileName.replace(".pdf", "") : "PDF Document";
+                setLoading(true, "Generating notes…");
+                runPipeline(text, lastTitle, "pdf", uri.toString());
+            });
+        }).start();
+    }
+
+    private void runYouTubeAnalysis(TextInputEditText input) {
+        String url = input != null && input.getText() != null ? input.getText().toString().trim() : "";
+        if (TextUtils.isEmpty(url)) {
+            Toast.makeText(this, "Enter a YouTube URL", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        url = YouTubeVideoAnalyzer.normalizeUrl(url);
+        if (input != null && input.getText() != null && !url.equals(input.getText().toString().trim())) {
+            input.setText(url);
+        }
+        String videoId = YouTubeVideoAnalyzer.extractVideoId(url);
+        if (videoId == null) {
+            Toast.makeText(this, "Invalid YouTube URL", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        discardNote();
+        setLoading(true, "Fetching transcript (YouTube)...");
+        String backendUrl = com.studymind.app.BuildConfig.TRANSCRIPT_BACKEND_URL;
+        YouTubeVideoAnalyzer analyzer = new YouTubeVideoAnalyzer(backendUrl);
+        analyzer.analyze(url, new YouTubeVideoAnalyzer.VideoAnalysisCallback() {
+            @Override
+            public void onProgress(String message) {
+                runOnUiThread(() -> setLoading(true, message));
+            }
+
+            @Override
+            public void onResult(YouTubeVideoAnalyzer.VideoAnalysisResult result) {
+                runOnUiThread(() -> {
+                    String transcript = result.transcript;
+                    if (TextUtils.isEmpty(transcript)) {
+                        showWhisperFallbackDialog(url, videoId);
+                        return;
+                    }
+                    lastTitle = result.videoTitle != null ? result.videoTitle : "YouTube Video";
+                    lastSourceType = "youtube";
+                    lastSourceRef = videoId;
+                    String preview = transcript.length() > 200 ? transcript.substring(0, 200) + "..." : transcript;
+                    setLoading(true, "Preview: " + preview);
+                    new android.os.Handler().postDelayed(() -> {
+                        setLoading(true, "Generating notes (" + transcript.length() + " chars)…");
+                        runPipeline(transcript, lastTitle, "youtube", videoId);
+                    }, 3000);
+                });
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                runOnUiThread(() -> showWhisperFallbackDialog(url, videoId));
+            }
+        });
+    }
+
+    private void showWhisperFallbackDialog(String url, String videoId) {
+        setLoading(false, null);
+        String apiKey = com.studymind.app.BuildConfig.OPENAI_API_KEY;
+        if (apiKey == null || apiKey.isEmpty()) {
+            Toast.makeText(this, "No transcript. Add OPENAI_API_KEY for Whisper fallback, or paste transcript below.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("No transcript available")
+                .setMessage("Tried Piped, YouTube, and watch page—no captions found.\n\nDownload audio and transcribe with Whisper? (Requires download)")
+                .setPositiveButton("Download & transcribe", (d, w) -> runWhisperFallback(videoId))
+                .setNegativeButton("Paste manually", (d, w) -> {
+                    TextInputEditText pasteInput = findViewById(R.id.pasteInput);
+                    if (pasteInput != null) pasteInput.getText().clear();
+                    Toast.makeText(this, "Paste the video transcript below, then tap Generate Notes.", Toast.LENGTH_LONG).show();
+                })
+                .show();
+    }
+
+    private void runWhisperFallback(String videoId) {
+        String apiKey = com.studymind.app.BuildConfig.OPENAI_API_KEY;
+        if (apiKey == null || apiKey.isEmpty()) return;
+        setLoading(true, "Downloading audio file…");
+        new com.studymind.app.youtube.YouTubeAudioExtractor().extractAudio(this, videoId,
+                new com.studymind.app.youtube.YouTubeAudioExtractor.ExtractCallback() {
+                    @Override
+                    public void onSuccess(Uri audioUri, String fileName) {
+                        runOnUiThread(() -> {
+                            setLoading(true, "Transcribing with Whisper…");
+                            lastTitle = "YouTube Video";
+                            lastSourceType = "whisper";
+                            lastSourceRef = videoId;
+                            WhisperApiClient whisper = new WhisperApiClient(apiKey);
+                            whisper.transcribe(MainActivity.this, audioUri, fileName, new WhisperApiClient.TranscribeCallback() {
+                                @Override
+                                public void onSuccess(String transcript) {
+                                    runOnUiThread(() -> {
+                                        if (TextUtils.isEmpty(transcript)) {
+                                            setLoading(false, null);
+                                            Toast.makeText(MainActivity.this, "No speech detected", Toast.LENGTH_LONG).show();
+                                            return;
+                                        }
+                                        setLoading(true, "Generating notes…");
+                                        runPipeline(transcript, lastTitle, "whisper", videoId);
+                                    });
+                                }
+                                @Override
+                                public void onError(Throwable t) {
+                                    runOnUiThread(() -> {
+                                        setLoading(false, null);
+                                        Toast.makeText(MainActivity.this, "Whisper failed: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                                    });
+                                }
+                            });
+                        });
+                    }
+                    @Override
+                    public void onError(Throwable t) {
+                        runOnUiThread(() -> {
+                            setLoading(false, null);
+                            Toast.makeText(MainActivity.this, "Could not extract audio. Paste transcript manually below.", Toast.LENGTH_LONG).show();
+                        });
+                    }
+                });
+    }
+
+    private void runPastedAnalysis(TextInputEditText input) {
+        discardNote();
+        String text = input != null && input.getText() != null ? input.getText().toString().trim() : "";
+        if (TextUtils.isEmpty(text)) {
+            Toast.makeText(this, "Paste some content first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String videoId = YouTubeVideoAnalyzer.extractVideoId(text);
+        if (videoId != null) {
+            TextInputEditText youtubeInput = findViewById(R.id.youtubeUrlInput);
+            if (youtubeInput != null) youtubeInput.setText(text);
+            Toast.makeText(this, "YouTube URL detected. Use Analyze Video above.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (text.length() < 50) {
+            Toast.makeText(this, "Content too short. Add more text for better results.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        lastTitle = "Pasted Content";
+        lastSourceType = "pasted";
+        lastSourceRef = "pasted";
+        setLoading(true, "Generating notes…");
+        runPipeline(text, lastTitle, "pasted", "pasted");
+    }
+
+    private void runPipeline(String content, String title, String sourceType, String sourceRef) {
+        if (StudyMindApp.getAIApiClient() == null) {
+            setLoading(false, null);
+            Toast.makeText(this, "API key not configured. Add OPENAI_API_KEY to local.properties.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        pipelineRequestId++;
+        final int currentRequestId = pipelineRequestId;
+        lastSourceType = sourceType;
+        lastSourceRef = sourceRef;
+        ChunkSummarizationPipeline pipeline = new ChunkSummarizationPipeline(StudyMindApp.getAIApiClient());
+        pipeline.process(content, title, sourceType, new ChunkSummarizationPipeline.PipelineCallback() {
+            @Override
+            public void onProgress(int current, int total) {
+                runOnUiThread(() -> setLoading(true, "Analyzing chunk " + current + "/" + total + "…"));
+            }
+
+            @Override
+            public void onResult(StructuredNotes notes, ContentAnalysisResult analysis) {
+                runOnUiThread(() -> {
+                    if (currentRequestId != pipelineRequestId) return;
+                    setLoading(false, null);
+                    lastNotes = notes;
+                    lastAnalysis = analysis;
+                    lastTitle = title;
+                    renderModularNotes(notes);
+                    View saveContainer = findViewById(R.id.saveButtonsContainer);
+                    if (saveContainer != null) saveContainer.setVisibility(View.VISIBLE);
+                    if ("pasted".equals(lastSourceType)) {
+                        TextInputEditText pasteInput = findViewById(R.id.pasteInput);
+                        if (pasteInput != null) pasteInput.getText().clear();
+                    }
+                });
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                runOnUiThread(() -> {
+                    setLoading(false, null);
+                    Toast.makeText(MainActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    private void discardNote() {
+        lastNotes = null;
+        lastAnalysis = null;
+        LinearLayout sections = findViewById(R.id.notesSectionsContainer);
+        if (sections != null) {
+            sections.removeAllViews();
+            sections.setVisibility(View.GONE);
+        }
+        notesResult.setVisibility(View.GONE);
+        notesResult.setText("");
+        View saveContainer = findViewById(R.id.saveButtonsContainer);
+        if (saveContainer != null) saveContainer.setVisibility(View.GONE);
+    }
+
+    private String cleanSectionContent(String s) {
+        if (s == null) return "";
+        s = s.trim();
+        // Remove leading N/A
+        s = s.replaceFirst("^(?i)N/A\\s*([-:]\\s*[^\\n]*)?[\\n\\r]*", "");
+        // Remove N/A on its own line anywhere in content
+        s = s.replaceAll("(?m)^\\s*N/A\\s*([-:][^\\n]*)?\\s*[\\r\\n]*", "");
+        return s.trim().replaceAll("\\n{3,}", "\n\n");
+    }
+
+    private void renderModularNotes(StructuredNotes notes) {
+        LinearLayout container = findViewById(R.id.notesSectionsContainer);
+        if (container == null) return;
+        container.removeAllViews();
+        container.setVisibility(View.VISIBLE);
+        notesResult.setVisibility(View.GONE);
+        String[] titles = {"Key Definitions", "Core Concepts", "Formulas & Steps", "Common Pitfalls", "Quick Review"};
+        String[] contents = {notes.keyDefinitions, notes.coreConcepts, notes.importantFormulas, notes.commonPitfalls, notes.quickReview};
+        LayoutInflater inflater = LayoutInflater.from(this);
+        for (int i = 0; i < titles.length; i++) {
+            String cleaned = cleanSectionContent(contents[i]);
+            if (cleaned.isEmpty()) continue;
+            View card = inflater.inflate(R.layout.item_note_section, container, false);
+            TextView titleView = card.findViewById(R.id.sectionTitle);
+            LinearLayout contentContainer = card.findViewById(R.id.sectionContentContainer);
+            TextView chevron = card.findViewById(R.id.sectionChevron);
+            titleView.setText(titles[i]);
+            populateSectionContent(contentContainer, cleaned, inflater);
+            card.setOnClickListener(v -> {
+                boolean expanded = contentContainer.getVisibility() == View.VISIBLE;
+                contentContainer.setVisibility(expanded ? View.GONE : View.VISIBLE);
+                chevron.setText(expanded ? "▶" : "▼");
+            });
+            container.addView(card);
+        }
+    }
+
+    private void populateSectionContent(LinearLayout container, String content, LayoutInflater inflater) {
+        container.removeAllViews();
+        java.util.List<android.util.Pair<String, java.util.List<String>>> topicBlocks = deduplicateTopicBlocks(parseTopicBlocks(content));
+        if (!topicBlocks.isEmpty()) {
+            for (android.util.Pair<String, java.util.List<String>> block : topicBlocks) {
+                View blockView = inflater.inflate(R.layout.item_note_topic_block, container, false);
+                TextView topicTitle = blockView.findViewById(R.id.topicTitle);
+                LinearLayout subContainer = blockView.findViewById(R.id.subPointsContainer);
+                topicTitle.setText(block.first);
+                for (String sub : block.second) {
+                    TextView subView = (TextView) inflater.inflate(R.layout.item_note_sub_point, subContainer, false);
+                    subView.setText("• " + sub);
+                    subContainer.addView(subView);
+                }
+                if (block.second.isEmpty()) subContainer.setVisibility(View.GONE);
+                container.addView(blockView);
+            }
+        } else {
+            java.util.List<String> items = parseBulletItems(content);
+            if (items.size() > 1) {
+                for (String item : items) {
+                    String text = item.trim().replaceFirst("^[•\\-]\\s*", "").replaceFirst("^\\d+\\.\\s*", "").trim();
+                    View row = inflater.inflate(R.layout.item_note_bullet, container, false);
+                    ((TextView) row.findViewById(R.id.bulletText)).setText(text);
+                    container.addView(row);
+                }
+            } else {
+                TextView fallback = new TextView(this);
+                fallback.setText(content);
+                fallback.setTextSize(14);
+                fallback.setLineSpacing(fallback.getLineSpacingExtra(), 1.35f);
+                fallback.setTextColor(ContextCompat.getColor(this, R.color.leetcode_text));
+                int pad = (int) (10 * getResources().getDisplayMetrics().density);
+                fallback.setPadding(0, pad, 0, pad);
+                container.addView(fallback);
+            }
+        }
+    }
+
+    private java.util.List<android.util.Pair<String, java.util.List<String>>> parseTopicBlocks(String content) {
+        java.util.List<android.util.Pair<String, java.util.List<String>>> result = new java.util.ArrayList<>();
+        String currentTopic = null;
+        java.util.List<String> currentSubs = new java.util.ArrayList<>();
+        for (String line : content.split("\\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            boolean isIndented = line.startsWith("  ") || line.startsWith("\t");
+            if (isIndented && currentTopic != null) {
+                currentSubs.add(trimmed.replaceFirst("^[\\-•]\\s*", "").replaceFirst("^\\d+\\.\\s*", "").trim());
+            } else if (trimmed.startsWith("•") || trimmed.startsWith("- ") || trimmed.matches("^\\d+\\.\\s+.*")) {
+                if (currentTopic != null) {
+                    result.add(android.util.Pair.create(currentTopic, new java.util.ArrayList<>(currentSubs)));
+                }
+                currentTopic = trimmed.replaceFirst("^[•\\-]\\s*", "").replaceFirst("^\\d+\\.\\s*", "").trim();
+                currentSubs = new java.util.ArrayList<>();
+            }
+        }
+        if (currentTopic != null) {
+            result.add(android.util.Pair.create(currentTopic, currentSubs));
+        }
+        return result;
+    }
+
+    private java.util.List<android.util.Pair<String, java.util.List<String>>> deduplicateTopicBlocks(
+            java.util.List<android.util.Pair<String, java.util.List<String>>> blocks) {
+        java.util.Map<String, android.util.Pair<String, java.util.List<String>>> seen = new java.util.LinkedHashMap<>();
+        for (android.util.Pair<String, java.util.List<String>> block : blocks) {
+            String key = block.first.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+            if (key.isEmpty()) continue;
+            if (seen.containsKey(key)) {
+                android.util.Pair<String, java.util.List<String>> existing = seen.get(key);
+                java.util.List<String> mergedSubs = mergeSubs(existing.second, block.second);
+                seen.put(key, android.util.Pair.create(existing.first, mergedSubs));
+            } else if (key.length() > 1 && key.endsWith("s") && seen.containsKey(key.substring(0, key.length() - 1))) {
+                String singular = key.substring(0, key.length() - 1);
+                android.util.Pair<String, java.util.List<String>> existing = seen.get(singular);
+                java.util.List<String> mergedSubs = mergeSubs(existing.second, block.second);
+                seen.put(singular, android.util.Pair.create(existing.first, mergedSubs));
+            } else if (seen.containsKey(key + "s")) {
+                android.util.Pair<String, java.util.List<String>> existing = seen.remove(key + "s");
+                java.util.List<String> mergedSubs = mergeSubs(existing.second, block.second);
+                seen.put(key, android.util.Pair.create(block.first, mergedSubs));
+            } else {
+                seen.put(key, block);
+            }
+        }
+        return new java.util.ArrayList<>(seen.values());
+    }
+
+    private java.util.List<String> mergeSubs(java.util.List<String> a, java.util.List<String> b) {
+        java.util.List<String> out = new java.util.ArrayList<>(a);
+        for (String sub : b) {
+            String subNorm = sub.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+            boolean dup = false;
+            for (String s : out) {
+                if (s.replaceAll("[^a-zA-Z0-9]", "").toLowerCase().equals(subNorm)) { dup = true; break; }
+            }
+            if (!dup) out.add(sub);
+        }
+        return out;
+    }
+
+    private java.util.List<String> parseBulletItems(String content) {
+        java.util.List<String> items = new java.util.ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        for (String line : content.split("\\n")) {
+            String trimmed = line.trim();
+            boolean isBullet = trimmed.startsWith("•") || trimmed.startsWith("- ")
+                    || trimmed.matches("^\\d+\\.\\s+.*");
+            if (isBullet && current.length() > 0) {
+                items.add(current.toString().trim());
+                current = new StringBuilder();
+            }
+            current.append(line).append("\n");
+        }
+        if (current.length() > 0) items.add(current.toString().trim());
+        if (items.size() <= 1) {
+            String[] paras = content.trim().split("\\n\\s*\\n");
+            if (paras.length > 1) {
+                items.clear();
+                for (String p : paras) {
+                    String s = p.trim();
+                    if (!s.isEmpty()) items.add(s);
+                }
+            }
+        }
+        if (items.size() <= 1 && content.contains("•")) {
+            String[] parts = content.split("\\s*•\\s*");
+            if (parts.length > 1) {
+                items.clear();
+                for (String p : parts) {
+                    String s = p.trim().replaceFirst("^\\d+\\.\\s*", "");
+                    if (!s.isEmpty()) items.add(s);
+                }
+            }
+        }
+        return items;
+    }
+
+    private void saveNote() {
+        if (lastNotes == null || lastAnalysis == null) return;
+        TextInputEditText titleInput = new TextInputEditText(this);
+        titleInput.setPadding(48, 32, 48, 32);
+        titleInput.setText(lastTitle);
+        titleInput.setHint("Note title");
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Save to History")
+                .setView(titleInput)
+                .setPositiveButton("Save", (d, w) -> {
+                    String title = titleInput.getText() != null ? titleInput.getText().toString().trim() : "";
+                    if (title.isEmpty()) title = lastTitle;
+                    StudyNote note = new StudyNote(title, lastSourceType, lastSourceRef,
+                            lastAnalysis.getSubject(), lastAnalysis.getStrategy().name(), lastNotes.toJson());
+                    repository.insert(note, id -> runOnUiThread(() -> {
+                        Toast.makeText(this, "Saved to history", Toast.LENGTH_SHORT).show();
+                        discardNote();
+                    }));
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void setLoading(boolean loading, String message) {
+        View progressContainer = findViewById(R.id.progressContainer);
+        if (progressContainer != null) {
+            progressContainer.setVisibility(loading ? View.VISIBLE : View.GONE);
+            if (loading) {
+                progressContainer.post(() -> {
+                    android.widget.ScrollView scroll = findViewById(R.id.mainScroll);
+                    if (scroll != null) scroll.smoothScrollTo(0, progressContainer.getTop());
+                });
+            }
+        }
+        if (progressText != null) {
+            progressText.setVisibility(loading && message != null ? View.VISIBLE : View.GONE);
+            if (message != null) progressText.setText(message);
+        }
+        setButtonsEnabled(!loading);
+    }
+
+    private void setButtonsEnabled(boolean enabled) {
+        findViewById(R.id.btnImportPdf).setEnabled(enabled);
+        findViewById(R.id.btnImportAudio).setEnabled(enabled);
+        findViewById(R.id.btnRecordVoice).setEnabled(enabled);
+        findViewById(R.id.btnAnalyzeYouTube).setEnabled(enabled);
+        findViewById(R.id.btnAnalyzePasted).setEnabled(enabled);
+    }
+
+    private void startVoiceRecording() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+            return;
+        }
+        if (recording) {
+            stopRecording();
+            return;
+        }
+        try {
+            java.io.File dir = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+            if (dir == null) dir = getFilesDir();
+            recordFile = new java.io.File(dir, "recording_" + System.currentTimeMillis() + ".m4a");
+            MediaRecorder recorder = new MediaRecorder();
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            recorder.setOutputFile(recordFile.getAbsolutePath());
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            recorder.prepare();
+            recorder.start();
+            mediaRecorder = recorder;
+            recording = true;
+            View btn = findViewById(R.id.btnRecordVoice);
+            if (btn instanceof com.google.android.material.button.MaterialButton) {
+                ((com.google.android.material.button.MaterialButton) btn).setText("Stop recording");
+            }
+            Toast.makeText(this, "Recording... Tap again to stop", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Recording failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void stopRecording() {
+        if (mediaRecorder != null) {
+            try {
+                mediaRecorder.stop();
+                mediaRecorder.release();
+            } catch (Exception ignored) {}
+            mediaRecorder = null;
+        }
+        recording = false;
+        View btn = findViewById(R.id.btnRecordVoice);
+        if (btn instanceof com.google.android.material.button.MaterialButton) {
+            ((com.google.android.material.button.MaterialButton) btn).setText("Record voice (Whisper)");
+        }
+        if (recordFile != null && recordFile.exists()) {
+            processAudio(Uri.fromFile(recordFile), "Voice recording");  // same pipeline as Import Audio/Video → transcript mode
+        }
+        recordFile = null;
+    }
+
+    private MediaRecorder mediaRecorder;
+    private java.io.File recordFile;
+    private boolean recording;
+
+    private final ActivityResultLauncher<String> requestPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            granted -> {
+                if (granted) startVoiceRecording();
+                else Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show();
+            }
+    );
+}
