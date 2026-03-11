@@ -141,7 +141,13 @@ public class YouTubeVideoAnalyzer {
 
                 @Override
                 public void onError(Throwable t) {
-                    callback.onProgress("Backend failed: " + t.getMessage());
+                    String msg = t != null ? t.getMessage() : "";
+                    callback.onProgress("Backend failed: " + msg);
+                    // 429 rate limit: skip Innertube/WatchPage (likely same limit), go straight to Gemini
+                    if (msg != null && (msg.contains("429") || msg.toLowerCase().contains("too many requests"))) {
+                        tryGemini(youtubeUrl, titleHint, callback);
+                        return;
+                    }
                     tryInnertube(youtubeUrl, videoId, titleHint, callback);
                 }
             });

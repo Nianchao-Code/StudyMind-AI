@@ -62,8 +62,8 @@ Open in Android Studio, sync Gradle, run on emulator or device.
 ## YouTube Flow
 
 1. **Vercel backend** (transcript.io → youtube-transcript-api)
-2. **Innertube** → **Watch page** (fallbacks)
-3. **Backend Gemini** (direct video analysis)
+2. **Innertube** → **Watch page** (fallbacks, skipped on 429)
+3. **Backend Gemini** (direct video analysis) — **requires `GEMINI_API_KEY` in Vercel**
 4. **Manual** — download video and import, or paste transcript
 
 ## Project Structure
