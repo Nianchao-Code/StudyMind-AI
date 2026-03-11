@@ -1,5 +1,7 @@
 package com.studymind.app.youtube;
 
+import android.util.Log;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -51,6 +53,7 @@ public class YouTubeVideoAnalyzer {
     public static String normalizeUrl(String url) {
         if (url == null || url.trim().isEmpty()) return url;
         String s = url.trim();
+        if (s.startsWith("ttps://")) return "h" + s;   // ttps -> https
         if (s.startsWith("ps://")) return "htt" + s;
         if (s.startsWith("ttp://")) return "ht" + s;
         if (s.startsWith("tp://")) return "htt" + s;
@@ -89,7 +92,10 @@ public class YouTubeVideoAnalyzer {
         }
     }
 
+    private static final String TAG = "StudyMind";
+
     private void startTranscriptFlow(String youtubeUrl, String videoId, String titleHint, VideoAnalysisCallback callback) {
+        Log.i(TAG, "startTranscriptFlow: videoId=" + videoId + " transcriptApi=" + (transcriptApiClient != null) + " backend=" + (backendClient != null) + " gemini=" + (geminiAnalyzer != null));
         if (transcriptApiClient != null) {
             callback.onProgress("Fetching transcript (Transcript API)...");
             transcriptApiClient.fetchTranscript(videoId, new TranscriptApiClient.TranscriptCallback() {
@@ -146,10 +152,12 @@ public class YouTubeVideoAnalyzer {
 
     private void tryGemini(String youtubeUrl, String titleHint, VideoAnalysisCallback callback) {
         if (geminiAnalyzer == null) {
+            Log.w(TAG, "tryGemini: no analyzer configured");
             callback.onProgress("No transcript. Falling back to Whisper (download + transcribe).");
             callback.onError(new IllegalStateException("No transcript available"));
             return;
         }
+        Log.i(TAG, "tryGemini: analyzing with Gemini");
         callback.onProgress("Analyzing video with Gemini (no transcript needed)...");
         geminiAnalyzer.analyze(youtubeUrl, titleHint, new GeminiYouTubeAnalyzer.GeminiCallback() {
             @Override
