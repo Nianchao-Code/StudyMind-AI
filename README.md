@@ -14,17 +14,25 @@ An Android app that turns study materials—PDFs, audio, video, and YouTube—in
 
 - **Android**: Java, Material Design 3, Room, Retrofit, OkHttp
 - **AI**: OpenAI GPT-4o-mini (summarization), Whisper (speech-to-text for imported audio/video)
-- **Backend**: Python serverless (Vercel) for YouTube transcript & audio
+- **Backend**: Python serverless (Vercel) for transcript, audio, summarize, Gemini, Whisper
 
 ## Prerequisites
 
 - Android Studio (Arctic Fox+)
-- OpenAI API key (required)
-- Optional: YouTube Data API v3, Transcript API token, Vercel backend URL, Gemini API key
+- Vercel backend with env vars: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `TRANSCRIPT_API_TOKEN` (optional)
 
 ## Setup
 
-### 1. Clone & configure
+### 1. Deploy backend (required for distribution)
+
+```bash
+cd backend
+vercel
+```
+
+In Vercel: add env vars `OPENAI_API_KEY`, `GEMINI_API_KEY`, `TRANSCRIPT_API_TOKEN` (optional).
+
+### 2. Clone & configure
 
 ```bash
 git clone https://github.com/Nianchao-Code/StudyMind-AI.git
@@ -34,25 +42,18 @@ cp local.properties.example local.properties
 
 Edit `local.properties`:
 
+**Distribution (APK for others):** Only need backend URL. No API keys in APK.
 ```properties
 sdk.dir=C\:\\Users\\YOUR_USERNAME\\AppData\\Local\\Android\\Sdk
-OPENAI_API_KEY=sk-proj-...              # required
-YOUTUBE_API_KEY=AIzaSy...               # optional, video title
-TRANSCRIPT_API_TOKEN=...                # optional, youtube-transcript.io (first)
-TRANSCRIPT_BACKEND_URL=https://...       # optional, Vercel backend
-GEMINI_API_KEY=...                      # optional, direct video analysis fallback
+TRANSCRIPT_BACKEND_URL=https://your-project.vercel.app/api
 ```
 
-### 2. Deploy backend (optional)
-
-For YouTube transcript/audio:
-
-```bash
-cd backend
-vercel
+**Dev (local testing without backend):**
+```properties
+OPENAI_API_KEY=sk-proj-...
+TRANSCRIPT_BACKEND_URL=...   # or omit to use direct OpenAI
+GEMINI_API_KEY=...          # optional, for YouTube fallback
 ```
-
-Set `TRANSCRIPT_BACKEND_URL=https://your-project.vercel.app/api` in `local.properties`.
 
 ### 3. Build & run
 
@@ -60,12 +61,10 @@ Open in Android Studio, sync Gradle, run on emulator or device.
 
 ## YouTube Flow
 
-1. **Transcript API** (youtube-transcript.io) — if `TRANSCRIPT_API_TOKEN` is set
-2. **Vercel backend** — if `TRANSCRIPT_BACKEND_URL` is set
-3. **Innertube** — direct YouTube API
-4. **Watch page** — HTML parsing
-5. **Gemini** — direct video analysis (if `GEMINI_API_KEY` is set)
-6. **Manual** — download video and import, or paste transcript
+1. **Vercel backend** (transcript.io → youtube-transcript-api)
+2. **Innertube** → **Watch page** (fallbacks)
+3. **Backend Gemini** (direct video analysis)
+4. **Manual** — download video and import, or paste transcript
 
 ## Project Structure
 
@@ -77,7 +76,7 @@ Open in Android Studio, sync Gradle, run on emulator or device.
 │   ├── pdf/         # PDF extraction
 │   ├── whisper/     # Whisper transcription
 │   └── youtube/     # Transcript API, backend, Innertube, Gemini
-├── backend/         # Vercel serverless (transcript, audio)
+├── backend/         # Vercel serverless (transcript, audio, summarize, gemini, whisper)
 └── local.properties.example
 ```
 

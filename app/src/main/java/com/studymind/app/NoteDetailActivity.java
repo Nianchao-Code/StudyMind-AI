@@ -359,8 +359,8 @@ public class NoteDetailActivity extends AppCompatActivity {
 
     private void askQuestion(String question) {
         if (note == null) return;
-        if (StudyMindApp.getAIApiClient() == null) {
-            Toast.makeText(this, "API key not configured. Add OPENAI_API_KEY to local.properties.", Toast.LENGTH_LONG).show();
+        if (StudyMindApp.getAIApiClient() instanceof com.studymind.app.api.MockAIApiClient) {
+            Toast.makeText(this, "Configure TRANSCRIPT_BACKEND_URL or OPENAI_API_KEY.", Toast.LENGTH_LONG).show();
             return;
         }
 

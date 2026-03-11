@@ -41,8 +41,8 @@ public class YouTubeVideoAnalyzer {
                 ? new TranscriptBackendClient(backendUrl) : null;
         this.transcriptFetcher = new YouTubeTranscriptFetcher();
         this.watchPageFetcher = new WatchPageTranscriptFetcher();
-        this.geminiAnalyzer = GeminiYouTubeAnalyzer.isConfigured(geminiApiKey)
-                ? new GeminiYouTubeAnalyzer(geminiApiKey) : null;
+        this.geminiAnalyzer = GeminiYouTubeAnalyzer.isConfigured(backendUrl, geminiApiKey)
+                ? new GeminiYouTubeAnalyzer(backendUrl, geminiApiKey) : null;
     }
 
     /**
