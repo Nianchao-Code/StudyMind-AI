@@ -25,6 +25,17 @@ def extract_video_id(url_or_id: str) -> str | None:
 
 
 def get_transcript(video_id: str) -> dict:
+    # 1. Try youtube-transcript.io if TRANSCRIPT_API_TOKEN is set (Vercel env)
+    import os
+    token = os.environ.get("TRANSCRIPT_API_TOKEN", "").strip()
+    if token:
+        r = _fetch_from_transcript_io(video_id, token)
+        if r.get("transcript"):
+            return {"video_id": video_id, "transcript": r["transcript"]}
+        if "error" not in r:
+            pass  # fall through to youtube-transcript-api
+
+    # 2. Fallback: youtube-transcript-api
     from youtube_transcript_api import YouTubeTranscriptApi
     from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
 
@@ -40,6 +51,56 @@ def get_transcript(video_id: str) -> dict:
         return {"error": "Video unavailable", "status": 404}
     except Exception as e:
         return {"error": str(e), "status": 500}
+
+
+def _to_text(val) -> str:
+    if isinstance(val, str):
+        return val
+    if isinstance(val, list):
+        return " ".join(s.get("text", "") if isinstance(s, dict) else str(s) for s in val)
+    return ""
+
+
+def _fetch_from_transcript_io(video_id: str, token: str) -> dict:
+    import base64
+    import urllib.request
+
+    auth = base64.b64encode((token + ":").encode()).decode()
+    body = json.dumps({"ids": [video_id]}).encode()
+    req = urllib.request.Request(
+        "https://www.youtube-transcript.io/api/transcripts",
+        data=body,
+        headers={
+            "Authorization": f"Basic {auth}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+            if isinstance(data, list) and data:
+                obj = data[0]
+                text = _to_text(obj.get("transcript") or obj.get("text"))
+                if text:
+                    return {"transcript": text}
+            if isinstance(data, dict):
+                if data.get("transcript"):
+                    return {"transcript": _to_text(data["transcript"])}
+                if data.get("transcripts") and data["transcripts"]:
+                    obj = data["transcripts"][0]
+                    text = _to_text(obj.get("transcript") or obj.get("text"))
+                    if text:
+                        return {"transcript": text}
+                if data.get("data"):
+                    for item in data["data"]:
+                        if item.get("video_id") == video_id or item.get("id") == video_id:
+                            text = _to_text(item.get("transcript") or item.get("text"))
+                            if text:
+                                return {"transcript": text}
+    except Exception as e:
+        return {"error": str(e)}
+    return {}
 
 
 class handler(BaseHTTPRequestHandler):

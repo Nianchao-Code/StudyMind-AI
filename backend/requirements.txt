@@ -1,2 +1,2 @@
 youtube-transcript-api==0.6.3
-pytubefix>=15.0.0
+pytubefix==10.3.8
