@@ -62,7 +62,8 @@ public class TranscriptApiClient {
     private String fetch(String videoId) throws IOException {
         if (apiToken == null || apiToken.isEmpty()) return null;
 
-        String auth = "Basic " + Base64.encodeToString((":" + apiToken).getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+        // Basic auth: token as username (common for "Basic API token")
+        String auth = "Basic " + Base64.encodeToString((apiToken + ":").getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
         String body = "{\"ids\":[\"" + videoId + "\"]}";
 
         Request req = new Request.Builder()
@@ -73,55 +74,81 @@ public class TranscriptApiClient {
                 .build();
 
         try (Response resp = client.newCall(req).execute()) {
-            if (!resp.isSuccessful() || resp.body() == null) return null;
-            String json = resp.body().string();
-            return parseTranscriptFromResponse(json, videoId);
+            String json = resp.body() != null ? resp.body().string() : "";
+            if (!resp.isSuccessful()) {
+                throw new IOException("Transcript API " + resp.code() + ": " + (json.length() > 200 ? json.substring(0, 200) + "..." : json));
+            }
+            String result = parseTranscriptFromResponse(json, videoId);
+            if (result == null && !json.trim().isEmpty()) {
+                throw new IOException("Transcript API: unexpected response format");
+            }
+            return result;
         }
     }
 
     private String parseTranscriptFromResponse(String json, String videoId) {
         try {
+            // Root may be array: [{"id":"xxx","transcript":"..."}]
+            if (json.trim().startsWith("[")) {
+                JsonArray arr = gson.fromJson(json, JsonArray.class);
+                if (arr != null && arr.size() > 0) {
+                    JsonObject first = arr.get(0).getAsJsonObject();
+                    return extractText(first);
+                }
+                return null;
+            }
+
             JsonObject root = gson.fromJson(json, JsonObject.class);
             if (root == null) return null;
 
-            // Try transcripts array: [{"id":"xxx","transcript":"..."}]
+            // transcripts array
             if (root.has("transcripts")) {
                 JsonArray arr = root.getAsJsonArray("transcripts");
                 if (arr != null && arr.size() > 0) {
                     JsonObject first = arr.get(0).getAsJsonObject();
-                    if (first.has("transcript")) return first.get("transcript").getAsString();
-                    if (first.has("text")) return first.get("text").getAsString();
+                    return extractText(first);
                 }
             }
 
-            // Try data array: [{"video_id":"xxx","transcript":"..."}]
+            // data array
             if (root.has("data")) {
                 JsonArray arr = root.getAsJsonArray("data");
                 if (arr != null) {
                     for (JsonElement el : arr) {
                         JsonObject obj = el.getAsJsonObject();
                         String id = obj.has("video_id") ? obj.get("video_id").getAsString() : obj.has("id") ? obj.get("id").getAsString() : null;
-                        if (videoId.equals(id) && (obj.has("transcript") || obj.has("text"))) {
-                            return obj.has("transcript") ? obj.get("transcript").getAsString() : obj.get("text").getAsString();
-                        }
+                        if (videoId.equals(id)) return extractText(obj);
                     }
                 }
             }
 
-            // Direct transcript field (single video)
+            // Direct fields
             if (root.has("transcript")) return root.get("transcript").getAsString();
             if (root.has("text")) return root.get("text").getAsString();
 
-            // First result in results array
+            // results array
             if (root.has("results")) {
                 JsonArray arr = root.getAsJsonArray("results");
                 if (arr != null && arr.size() > 0) {
-                    JsonObject first = arr.get(0).getAsJsonObject();
-                    if (first.has("transcript")) return first.get("transcript").getAsString();
-                    if (first.has("text")) return first.get("text").getAsString();
+                    return extractText(arr.get(0).getAsJsonObject());
                 }
             }
         } catch (Exception ignored) {}
+        return null;
+    }
+
+    private String extractText(JsonObject obj) {
+        if (obj.has("transcript")) return obj.get("transcript").getAsString();
+        if (obj.has("text")) return obj.get("text").getAsString();
+        // Segments: [{"text":"..."}]
+        if (obj.has("segments")) {
+            StringBuilder sb = new StringBuilder();
+            for (JsonElement el : obj.getAsJsonArray("segments")) {
+                JsonObject s = el.getAsJsonObject();
+                if (s.has("text")) sb.append(s.get("text").getAsString()).append(" ");
+            }
+            return sb.toString().trim();
+        }
         return null;
     }
 

@@ -20,7 +20,7 @@ import com.studymind.app.agent.StructuredNotes;
 import com.studymind.app.agent.SummarizationStrategy;
 
 /**
- * Analyzes YouTube videos directly via Gemini API (no transcript needed).
+ * Analyzes YouTube videos via Gemini (direct or backend proxy).
  * Fallback when transcript fetching fails.
  */
 public class GeminiYouTubeAnalyzer {
@@ -37,7 +37,8 @@ public class GeminiYouTubeAnalyzer {
             + "quickReview: 考点总结—5–7 concepts. • Topic\\n  - key point.\n"
             + "MUST populate ALL 5 sections. Never use N/A. Use • for main topics and - for sub-points.";
 
-    private final String apiKey;
+    private final String backendBaseUrl;
+    private final String geminiApiKey;
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
@@ -45,12 +46,17 @@ public class GeminiYouTubeAnalyzer {
     private final Gson gson = new Gson();
     private final Executor executor = Executors.newSingleThreadExecutor();
 
-    public GeminiYouTubeAnalyzer(String apiKey) {
-        this.apiKey = apiKey != null ? apiKey.trim() : null;
+    /** @param backendBaseUrl Backend URL (e.g. https://xxx.vercel.app/api); if set, uses backend proxy. */
+    public GeminiYouTubeAnalyzer(String backendBaseUrl, String geminiApiKey) {
+        this.backendBaseUrl = backendBaseUrl != null && !backendBaseUrl.trim().isEmpty()
+                ? backendBaseUrl.trim().replaceAll("/+$", "") : null;
+        this.geminiApiKey = geminiApiKey != null && !geminiApiKey.trim().isEmpty()
+                ? geminiApiKey.trim() : null;
     }
 
-    public static boolean isConfigured(String key) {
-        return key != null && !key.trim().isEmpty();
+    public static boolean isConfigured(String backendUrl, String geminiKey) {
+        return (backendUrl != null && !backendUrl.trim().isEmpty())
+                || (geminiKey != null && !geminiKey.trim().isEmpty());
     }
 
     public void analyze(String youtubeUrl, String title, GeminiCallback callback) {
@@ -69,17 +75,54 @@ public class GeminiYouTubeAnalyzer {
     }
 
     private GeminiResult fetch(String youtubeUrl, String title) throws Exception {
-        if (apiKey == null || apiKey.isEmpty()) return null;
+        if (backendBaseUrl != null) {
+            return fetchViaBackend(youtubeUrl, title);
+        }
+        if (geminiApiKey == null || geminiApiKey.isEmpty()) return null;
+        return fetchViaGemini(youtubeUrl, title);
+    }
 
+    private GeminiResult fetchViaBackend(String youtubeUrl, String title) throws Exception {
+        JsonObject body = new JsonObject();
+        body.addProperty("url", youtubeUrl);
+        body.addProperty("title", title != null ? title : "YouTube");
+        Request req = new Request.Builder()
+                .url(backendBaseUrl + "/gemini_youtube")
+                .post(RequestBody.create(gson.toJson(body), JSON))
+                .addHeader("Content-Type", "application/json")
+                .build();
+        try (Response resp = client.newCall(req).execute()) {
+            String json = resp.body() != null ? resp.body().string() : "";
+            if (!resp.isSuccessful()) {
+                throw new IOException("Backend " + resp.code() + ": " + (json.length() > 300 ? json.substring(0, 300) + "..." : json));
+            }
+            JsonObject root = gson.fromJson(json, JsonObject.class);
+            if (root == null || !root.has("notes")) return null;
+            String notesText = root.get("notes").getAsString();
+            StructuredNotes notes = parseStructuredNotes(notesText);
+            if (notes == null) return null;
+            ContentAnalysisResult analysis = new ContentAnalysisResult(
+                    "YouTube Video", "video", "general",
+                    SummarizationStrategy.CONCEPT_THEORY, ""
+            );
+            return new GeminiResult(notes, analysis);
+        }
+    }
+
+    private GeminiResult fetchViaGemini(String youtubeUrl, String title) throws Exception {
         JsonObject root = new JsonObject();
         JsonArray contents = new JsonArray();
         JsonObject content = new JsonObject();
         JsonArray parts = new JsonArray();
 
+        // Part 1: fileData with YouTube URL (Gemini accepts YouTube URLs directly)
+        JsonObject fileDataPart = new JsonObject();
         JsonObject fileData = new JsonObject();
-        fileData.addProperty("file_uri", youtubeUrl);
-        parts.add(fileData);
+        fileData.addProperty("fileUri", youtubeUrl);
+        fileDataPart.add("fileData", fileData);
+        parts.add(fileDataPart);
 
+        // Part 2: prompt
         JsonObject textPart = new JsonObject();
         textPart.addProperty("text", "Video: " + (title != null ? title : "YouTube") + "\n\n" + PROMPT);
         parts.add(textPart);
@@ -93,16 +136,22 @@ public class GeminiYouTubeAnalyzer {
         generationConfig.addProperty("maxOutputTokens", 8192);
         root.add("generationConfig", generationConfig);
 
-        String url = GEMINI_URL + "?key=" + apiKey;
+        String url = GEMINI_URL + "?key=" + geminiApiKey;
         Request req = new Request.Builder()
                 .url(url)
                 .post(RequestBody.create(gson.toJson(root), JSON))
                 .build();
 
         try (Response resp = client.newCall(req).execute()) {
-            if (!resp.isSuccessful() || resp.body() == null) return null;
-            String json = resp.body().string();
-            return parseResponse(json);
+            String json = resp.body() != null ? resp.body().string() : "";
+            if (!resp.isSuccessful()) {
+                throw new IOException("Gemini API " + resp.code() + ": " + (json.length() > 300 ? json.substring(0, 300) + "..." : json));
+            }
+            GeminiResult result = parseResponse(json);
+            if (result == null) {
+                throw new IOException("Gemini: failed to parse response");
+            }
+            return result;
         }
     }
 

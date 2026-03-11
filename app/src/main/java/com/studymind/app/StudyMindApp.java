@@ -5,11 +5,13 @@ import android.app.Application;
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.studymind.app.api.AIApiClient;
+import com.studymind.app.api.BackendAIApiClient;
 import com.studymind.app.api.MockAIApiClient;
 import com.studymind.app.api.OpenAIApiClient;
 
 /**
  * Application entry point, provides global AI client.
+ * Prefers backend proxy (no keys in APK); falls back to direct OpenAI for dev.
  */
 public class StudyMindApp extends Application {
     private static AIApiClient aiApiClient;
@@ -18,10 +20,16 @@ public class StudyMindApp extends Application {
     public void onCreate() {
         super.onCreate();
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
-        String apiKey = BuildConfig.OPENAI_API_KEY;
-        aiApiClient = (apiKey != null && !apiKey.isEmpty())
-                ? new OpenAIApiClient(apiKey)
-                : new MockAIApiClient();  // Use mock when not configured, for testing
+        String backendUrl = BuildConfig.TRANSCRIPT_BACKEND_URL;
+        String openaiKey = BuildConfig.OPENAI_API_KEY;
+
+        if (backendUrl != null && !backendUrl.trim().isEmpty()) {
+            aiApiClient = new BackendAIApiClient(backendUrl);
+        } else if (openaiKey != null && !openaiKey.isEmpty()) {
+            aiApiClient = new OpenAIApiClient(openaiKey);
+        } else {
+            aiApiClient = new MockAIApiClient();
+        }
     }
 
     public static AIApiClient getAIApiClient() {

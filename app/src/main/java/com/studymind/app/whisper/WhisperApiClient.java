@@ -4,6 +4,7 @@ import android.content.Context;
 import android.net.Uri;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
 
 import java.io.IOException;
@@ -22,14 +23,16 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
- * OpenAI Whisper API client for speech-to-text transcription.
+ * Whisper transcription: backend proxy or direct OpenAI.
  * Supports: mp3, mp4, mpeg, mpga, m4a, wav, webm.
  */
 public class WhisperApiClient {
     private static final String API_URL = "https://api.openai.com/v1/audio/transcriptions";
-    private static final long MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (Whisper API limit)
+    private static final long MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (direct API)
+    private static final long MAX_FILE_SIZE_BACKEND = 3 * 1024 * 1024; // 3 MB (backend/Vercel limit)
 
     private final String apiKey;
+    private final String backendBaseUrl;
     private final OkHttpClient client;
     private final Gson gson;
     private final Executor executor;
@@ -39,7 +42,14 @@ public class WhisperApiClient {
     private static final int READ_TIMEOUT_SEC = 300;   // Whisper processes ~1 min per 1 min audio
 
     public WhisperApiClient(String apiKey) {
+        this(apiKey, null);
+    }
+
+    /** @param backendBaseUrl When set, uses backend /api/whisper (no API key in APK). */
+    public WhisperApiClient(String apiKey, String backendBaseUrl) {
         this.apiKey = apiKey;
+        this.backendBaseUrl = backendBaseUrl != null && !backendBaseUrl.trim().isEmpty()
+                ? backendBaseUrl.trim().replaceAll("/+$", "") : null;
         this.client = new OkHttpClient.Builder()
                 .connectTimeout(CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
                 .writeTimeout(WRITE_TIMEOUT_SEC, TimeUnit.SECONDS)
@@ -53,7 +63,12 @@ public class WhisperApiClient {
         executor.execute(() -> {
             try {
                 long fileSize = getFileSize(context, audioUri);
-                if (fileSize > MAX_FILE_SIZE) {
+                long limit = backendBaseUrl != null ? MAX_FILE_SIZE_BACKEND : MAX_FILE_SIZE;
+                if (fileSize > limit) {
+                    if (backendBaseUrl != null) {
+                        runOnMain(() -> callback.onError(new IOException("Audio too large for backend (max 3MB). Use shorter clip.")));
+                        return;
+                    }
                     transcribeChunked(context, audioUri, fileName, callback);
                 } else {
                     transcribeSingle(context, audioUri, fileName, callback);
@@ -126,6 +141,9 @@ public class WhisperApiClient {
     }
 
     private String doTranscribeBlocking(byte[] bytes, String fileName, String mimeType) throws IOException {
+        if (backendBaseUrl != null) {
+            return doTranscribeViaBackend(bytes, fileName, mimeType);
+        }
         RequestBody fileBody = RequestBody.create(bytes, MediaType.parse(mimeType));
         RequestBody body = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
@@ -142,6 +160,27 @@ public class WhisperApiClient {
             String bodyStr = response.body() != null ? response.body().string() : "";
             if (!response.isSuccessful()) {
                 throw new IOException("Whisper API error: " + response.code() + " " + bodyStr);
+            }
+            WhisperResponse resp = gson.fromJson(bodyStr, WhisperResponse.class);
+            return resp != null && resp.text != null ? resp.text.trim() : "";
+        }
+    }
+
+    private String doTranscribeViaBackend(byte[] bytes, String fileName, String mimeType) throws IOException {
+        String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+        JsonObject body = new JsonObject();
+        body.addProperty("audio", b64);
+        body.addProperty("filename", fileName != null ? fileName : "audio.m4a");
+        body.addProperty("mimeType", mimeType);
+        Request request = new Request.Builder()
+                .url(backendBaseUrl + "/whisper")
+                .post(RequestBody.create(gson.toJson(body), MediaType.parse("application/json")))
+                .addHeader("Content-Type", "application/json")
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            String bodyStr = response.body() != null ? response.body().string() : "";
+            if (!response.isSuccessful()) {
+                throw new IOException("Backend Whisper " + response.code() + ": " + bodyStr);
             }
             WhisperResponse resp = gson.fromJson(bodyStr, WhisperResponse.class);
             return resp != null && resp.text != null ? resp.text.trim() : "";
@@ -181,6 +220,17 @@ public class WhisperApiClient {
     }
 
     private void doTranscribe(byte[] bytes, String fileName, String mimeType, TranscribeCallback callback) {
+        if (backendBaseUrl != null) {
+            executor.execute(() -> {
+                try {
+                    String text = doTranscribeViaBackend(bytes, fileName != null ? fileName : "audio.m4a", mimeType);
+                    runOnMain(() -> callback.onSuccess(text != null ? text : ""));
+                } catch (Exception e) {
+                    runOnMain(() -> callback.onError(e));
+                }
+            });
+            return;
+        }
         RequestBody fileBody = RequestBody.create(bytes, MediaType.parse(mimeType));
         RequestBody body = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)

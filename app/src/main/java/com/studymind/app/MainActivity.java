@@ -142,15 +142,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void processAudio(Uri uri, String titleOverride) {
         discardNote();
+        String backendUrl = com.studymind.app.BuildConfig.TRANSCRIPT_BACKEND_URL;
         String apiKey = com.studymind.app.BuildConfig.OPENAI_API_KEY;
-        if (apiKey == null || apiKey.isEmpty()) {
-            Toast.makeText(this, "OpenAI API key required for Whisper. Add OPENAI_API_KEY to local.properties.", Toast.LENGTH_LONG).show();
+        if ((backendUrl == null || backendUrl.isEmpty()) && (apiKey == null || apiKey.isEmpty())) {
+            Toast.makeText(this, "Configure TRANSCRIPT_BACKEND_URL or OPENAI_API_KEY for audio.", Toast.LENGTH_LONG).show();
             return;
         }
         String fileName = uri.getLastPathSegment();
         lastTitle = titleOverride != null ? titleOverride : (fileName != null ? fileName.replaceAll("\\.[a-zA-Z0-9]+$", "") : "Audio");
         setLoading(true, "Transcribing with Whisper…");
-        WhisperApiClient whisper = new WhisperApiClient(apiKey);
+        WhisperApiClient whisper = new WhisperApiClient(apiKey != null ? apiKey : "", backendUrl);
         whisper.transcribe(this, uri, fileName, new WhisperApiClient.TranscribeCallback() {
             @Override
             public void onSuccess(String transcript) {
@@ -306,9 +307,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void runPipeline(String content, String title, String sourceType, String sourceRef) {
-        if (StudyMindApp.getAIApiClient() == null) {
+        if (StudyMindApp.getAIApiClient() instanceof com.studymind.app.api.MockAIApiClient) {
             setLoading(false, null);
-            Toast.makeText(this, "API key not configured. Add OPENAI_API_KEY to local.properties.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Configure TRANSCRIPT_BACKEND_URL or OPENAI_API_KEY in local.properties.", Toast.LENGTH_LONG).show();
             return;
         }
         pipelineRequestId++;
