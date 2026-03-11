@@ -20,9 +20,22 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * Extracts audio from YouTube via Piped API for Whisper fallback.
+ * Extracts audio from YouTube for Whisper fallback.
+ * Tries backend (yt-dlp) first if configured, else Piped API.
  */
 public class YouTubeAudioExtractor {
+    private final String backendBaseUrl;
+
+    public YouTubeAudioExtractor() {
+        this(null);
+    }
+
+    /** @param backendBaseUrl TRANSCRIPT_BACKEND_URL (e.g. https://xxx.vercel.app/api); if set, backend /audio is tried first. */
+    public YouTubeAudioExtractor(String backendBaseUrl) {
+        this.backendBaseUrl = backendBaseUrl != null && !backendBaseUrl.trim().isEmpty()
+                ? backendBaseUrl.trim().replaceAll("/+$", "") : null;
+    }
+
     private static final String[] PIPED_INSTANCES = {
             "https://pipedapi.kavin.rocks",
             "https://pipedapi.leptons.xyz",
@@ -66,6 +79,10 @@ public class YouTubeAudioExtractor {
     }
 
     private String fetchAudioUrl(String videoId) {
+        if (backendBaseUrl != null) {
+            String url = fetchFromBackend(videoId);
+            if (url != null) return url;
+        }
         for (String base : PIPED_INSTANCES) {
             try {
                 String url = base + "/streams/" + videoId;
@@ -88,6 +105,22 @@ public class YouTubeAudioExtractor {
                 }
             } catch (Exception ignored) {}
         }
+        return null;
+    }
+
+    private String fetchFromBackend(String videoId) {
+        try {
+            String url = backendBaseUrl + "/audio?video_id=" + videoId;
+            Request req = new Request.Builder().url(url)
+                    .addHeader("Accept", "application/json")
+                    .build();
+            try (Response resp = client.newCall(req).execute()) {
+                if (!resp.isSuccessful() || resp.body() == null) return null;
+                String json = resp.body().string();
+                JsonObject obj = gson.fromJson(json, JsonObject.class);
+                if (obj != null && obj.has("url")) return obj.get("url").getAsString();
+            }
+        } catch (Exception ignored) {}
         return null;
     }
 

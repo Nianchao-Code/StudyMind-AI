@@ -27,6 +27,8 @@ android {
         buildConfigField "String", "OPENAI_API_KEY", "\"${localProps.getProperty("OPENAI_API_KEY", "")}\""
         buildConfigField "String", "YOUTUBE_API_KEY", "\"${localProps.getProperty("YOUTUBE_API_KEY", "")}\""
         buildConfigField "String", "TRANSCRIPT_BACKEND_URL", "\"${localProps.getProperty("TRANSCRIPT_BACKEND_URL", "")}\""
+        buildConfigField "String", "TRANSCRIPT_API_TOKEN", "\"${localProps.getProperty("TRANSCRIPT_API_TOKEN", "")}\""
+        buildConfigField "String", "GEMINI_API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "")}\""
     }
 
     buildTypes {

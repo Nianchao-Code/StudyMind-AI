@@ -19,22 +19,30 @@ public class YouTubeVideoAnalyzer {
             "(?:youtube\\.com/watch\\?v=|youtu\\.be/|youtube\\.com/embed/)([a-zA-Z0-9_-]{11})"
     );
 
+    private final TranscriptApiClient transcriptApiClient;
     private final TranscriptBackendClient backendClient;
     private final YouTubeTranscriptFetcher transcriptFetcher;
-    private final InvidiousCaptionsFetcher invidiousCaptions;
     private final WatchPageTranscriptFetcher watchPageFetcher;
+    private final GeminiYouTubeAnalyzer geminiAnalyzer;
 
     public YouTubeVideoAnalyzer() {
-        this(null);
+        this(null, null, null);
     }
 
-    /** @param backendUrl TRANSCRIPT_BACKEND_URL from BuildConfig; if set, backend is tried first. */
-    public YouTubeVideoAnalyzer(String backendUrl) {
+    /**
+     * @param transcriptApiToken youtube-transcript.io API token (tried first)
+     * @param backendUrl TRANSCRIPT_BACKEND_URL (Vercel backend)
+     * @param geminiApiKey GEMINI_API_KEY for direct video analysis fallback
+     */
+    public YouTubeVideoAnalyzer(String transcriptApiToken, String backendUrl, String geminiApiKey) {
+        this.transcriptApiClient = TranscriptApiClient.isConfigured(transcriptApiToken)
+                ? new TranscriptApiClient(transcriptApiToken) : null;
         this.backendClient = TranscriptBackendClient.isConfigured(backendUrl)
                 ? new TranscriptBackendClient(backendUrl) : null;
         this.transcriptFetcher = new YouTubeTranscriptFetcher();
-        this.invidiousCaptions = new InvidiousCaptionsFetcher();
         this.watchPageFetcher = new WatchPageTranscriptFetcher();
+        this.geminiAnalyzer = GeminiYouTubeAnalyzer.isConfigured(geminiApiKey)
+                ? new GeminiYouTubeAnalyzer(geminiApiKey) : null;
     }
 
     /**
@@ -75,13 +83,40 @@ public class YouTubeVideoAnalyzer {
 
         if (YouTubeClient.hasApiKey()) {
             callback.onProgress("Fetching video metadata...");
-            fetchVideoTitle(videoId, title -> startTranscriptFlow(videoId, title, callback));
+            fetchVideoTitle(videoId, title -> startTranscriptFlow(youtubeUrl, videoId, title, callback));
         } else {
-            startTranscriptFlow(videoId, null, callback);
+            startTranscriptFlow(youtubeUrl, videoId, null, callback);
         }
     }
 
-    private void startTranscriptFlow(String videoId, String titleHint, VideoAnalysisCallback callback) {
+    private void startTranscriptFlow(String youtubeUrl, String videoId, String titleHint, VideoAnalysisCallback callback) {
+        if (transcriptApiClient != null) {
+            callback.onProgress("Fetching transcript (Transcript API)...");
+            transcriptApiClient.fetchTranscript(videoId, new TranscriptApiClient.TranscriptCallback() {
+                @Override
+                public void onSuccess(String transcript) {
+                    int len = transcript != null ? transcript.trim().length() : 0;
+                    boolean trusted = isTrustedTranscript(titleHint, transcript);
+                    callback.onProgress("Transcript API → " + len + " chars, trusted=" + trusted);
+                    if (trusted) {
+                        callback.onProgress("Generating notes from Transcript API...");
+                        proceedWithTranscript(titleHint, transcript.trim(), callback, "transcript-api");
+                    } else {
+                        tryBackend(youtubeUrl, videoId, titleHint, callback);
+                    }
+                }
+                @Override
+                public void onError(Throwable t) {
+                    callback.onProgress("Transcript API failed: " + t.getMessage());
+                    tryBackend(youtubeUrl, videoId, titleHint, callback);
+                }
+            });
+            return;
+        }
+        tryBackend(youtubeUrl, videoId, titleHint, callback);
+    }
+
+    private void tryBackend(String youtubeUrl, String videoId, String titleHint, VideoAnalysisCallback callback) {
         if (backendClient != null) {
             callback.onProgress("Fetching transcript (backend)...");
             backendClient.fetchTranscript(videoId, new TranscriptBackendClient.TranscriptCallback() {
@@ -94,23 +129,43 @@ public class YouTubeVideoAnalyzer {
                         callback.onProgress("Generating notes from backend...");
                         proceedWithTranscript(titleHint, transcript.trim(), callback, "backend");
                     } else {
-                        tryInnertube(videoId, titleHint, callback);
+                        tryInnertube(youtubeUrl, videoId, titleHint, callback);
                     }
                 }
 
                 @Override
                 public void onError(Throwable t) {
                     callback.onProgress("Backend failed: " + t.getMessage());
-                    tryInnertube(videoId, titleHint, callback);
+                    tryInnertube(youtubeUrl, videoId, titleHint, callback);
                 }
             });
             return;
         }
-        tryInnertube(videoId, titleHint, callback);
+        tryInnertube(youtubeUrl, videoId, titleHint, callback);
     }
 
-    private void tryInnertube(String videoId, String titleHint, VideoAnalysisCallback callback) {
-        callback.onProgress("Step 1/3: YouTube Innertube...");
+    private void tryGemini(String youtubeUrl, String titleHint, VideoAnalysisCallback callback) {
+        if (geminiAnalyzer == null) {
+            callback.onProgress("No transcript. Falling back to Whisper (download + transcribe).");
+            callback.onError(new IllegalStateException("No transcript available"));
+            return;
+        }
+        callback.onProgress("Analyzing video with Gemini (no transcript needed)...");
+        geminiAnalyzer.analyze(youtubeUrl, titleHint, new GeminiYouTubeAnalyzer.GeminiCallback() {
+            @Override
+            public void onSuccess(com.studymind.app.agent.StructuredNotes notes, com.studymind.app.agent.ContentAnalysisResult analysis) {
+                callback.onGeminiResult(notes, analysis, titleHint != null ? titleHint : "YouTube Video");
+            }
+            @Override
+            public void onError(Throwable t) {
+                callback.onProgress("Gemini failed: " + t.getMessage());
+                callback.onError(t);
+            }
+        });
+    }
+
+    private void tryInnertube(String youtubeUrl, String videoId, String titleHint, VideoAnalysisCallback callback) {
+        callback.onProgress("Step 1/2: YouTube Innertube...");
         transcriptFetcher.fetchTranscript(videoId, new YouTubeTranscriptFetcher.TranscriptCallback() {
             @Override
             public void onSuccess(String transcript, String source) {
@@ -122,19 +177,19 @@ public class YouTubeVideoAnalyzer {
                     proceedWithTranscript(titleHint, transcript.trim(), callback, source);
                     return;
                 }
-                tryWatchPage(videoId, titleHint, callback);
+                tryWatchPage(youtubeUrl, videoId, titleHint, callback);
             }
 
             @Override
             public void onError(Throwable t) {
                 callback.onProgress("Step 1 failed: " + t.getMessage());
-                tryWatchPage(videoId, titleHint, callback);
+                tryWatchPage(youtubeUrl, videoId, titleHint, callback);
             }
         });
     }
 
-    private void tryWatchPage(String videoId, String titleHint, VideoAnalysisCallback callback) {
-        callback.onProgress("Step 2/3: YouTube watch page...");
+    private void tryWatchPage(String youtubeUrl, String videoId, String titleHint, VideoAnalysisCallback callback) {
+        callback.onProgress("Step 2/2: YouTube watch page...");
         new Thread(() -> {
             try {
                 String transcript = watchPageFetcher.fetchTranscript(videoId);
@@ -145,39 +200,13 @@ public class YouTubeVideoAnalyzer {
                     callback.onProgress("Generating notes from watch-page...");
                     proceedWithTranscript(titleHint, transcript.trim(), callback, "youtube-watch-page");
                 } else {
-                    tryPiped(videoId, titleHint, callback);
+                    tryGemini(youtubeUrl, titleHint, callback);
                 }
             } catch (Exception e) {
                 callback.onProgress("Step 2 failed: " + e.getMessage());
-                tryPiped(videoId, titleHint, callback);
+                tryGemini(youtubeUrl, titleHint, callback);
             }
         }).start();
-    }
-
-    private void tryPiped(String videoId, String titleHint, VideoAnalysisCallback callback) {
-        callback.onProgress("Step 3/3: Piped API...");
-        invidiousCaptions.fetchTranscript(videoId, new InvidiousCaptionsFetcher.TranscriptCallback() {
-            @Override
-            public void onSuccess(String transcript) {
-                int len = transcript != null ? transcript.trim().length() : 0;
-                boolean trusted = isTrustedTranscript(titleHint, transcript);
-                callback.onProgress("Step 3 result: Piped → " + len + " chars, trusted=" + trusted);
-                if (trusted) {
-                    callback.onProgress("Generating notes from Piped...");
-                    proceedWithTranscript(titleHint, transcript.trim(), callback, "piped");
-                } else {
-                    callback.onProgress("All 3 sources failed. Showing Whisper fallback.");
-                    callback.onError(new IllegalStateException("No transcript available"));
-                }
-            }
-
-            @Override
-            public void onError(Throwable t) {
-                callback.onProgress("Step 3 failed: " + t.getMessage());
-                callback.onProgress("All 3 sources failed. Showing Whisper fallback.");
-                callback.onError(t);
-            }
-        });
     }
 
     private void proceedWithTranscript(String titleHint, String transcript, VideoAnalysisCallback callback, String source) {
@@ -257,5 +286,11 @@ public class YouTubeVideoAnalyzer {
         void onResult(VideoAnalysisResult result);
         void onError(Throwable t);
         default void onProgress(String message) {}
+        /** Called when Gemini analyzes video directly (no transcript). Override to render notes. */
+        default void onGeminiResult(com.studymind.app.agent.StructuredNotes notes,
+                                    com.studymind.app.agent.ContentAnalysisResult analysis,
+                                    String title) {
+            onError(new IllegalStateException("No transcript available"));
+        }
     }
 }

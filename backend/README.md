@@ -1,9 +1,8 @@
-# Transcript Backend
+# Transcript & Audio Backend
 
-YouTube transcript API using `youtube-transcript-api`. Deploy to Vercel:
+- `/api/transcript?video_id=xxx` — YouTube transcript (youtube-transcript-api)
+- `/api/audio?video_id=xxx` — Audio URL for Whisper fallback (yt-dlp)
 
-```bash
-vercel
-```
+Deploy to Vercel: `vercel`
 
-Set `TRANSCRIPT_BACKEND_URL=https://your-project.vercel.app/api` in the Android app's `local.properties`.
+Set `TRANSCRIPT_BACKEND_URL=https://your-project.vercel.app/api` in `local.properties`.

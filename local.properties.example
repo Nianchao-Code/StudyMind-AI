@@ -7,3 +7,7 @@ OPENAI_API_KEY=你的OpenAI密钥
 YOUTUBE_API_KEY=你的YouTube_API_Key
 # Transcript backend (Vercel 部署后填写)
 # TRANSCRIPT_BACKEND_URL=https://xxx.vercel.app/api
+# Transcript API (youtube-transcript.io, 优先使用)
+# TRANSCRIPT_API_TOKEN=你的API_Token
+# Gemini fallback (transcript 失败时直接分析视频)
+# GEMINI_API_KEY=你的Gemini_API_Key
