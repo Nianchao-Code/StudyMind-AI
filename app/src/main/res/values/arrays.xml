@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="strategy_options">
+        <item>General</item>
+        <item>Math / Formula</item>
+        <item>Algorithm</item>
+        <item>Circuit / Physics</item>
+        <item>Concept / Theory</item>
+    </string-array>
+</resources>

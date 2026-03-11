@@ -1,0 +1,9 @@
+## 复制此文件为 local.properties 并填入你的配置
+## local.properties 不会被提交到 Git（含敏感信息）
+
+sdk.dir=C\:\\Users\\Nianchao\\AppData\\Local\\Android\\Sdk
+
+OPENAI_API_KEY=你的OpenAI密钥
+YOUTUBE_API_KEY=你的YouTube_API_Key
+# Transcript backend (Vercel 部署后填写)
+# TRANSCRIPT_BACKEND_URL=https://xxx.vercel.app/api

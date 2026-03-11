@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- StudyMind: minimalist brain - two lobes, LeetCode orange -->
+    <path
+        android:fillColor="#00BFA5"
+        android:pathData="M54,20
+            C36,20 22,36 22,54
+            C22,66 30,76 42,80
+            L42,84 C42,90 48,94 54,94
+            C60,94 66,90 66,84
+            L66,80 C78,76 86,66 86,54
+            C86,36 72,20 54,20
+            Z"/>
+</vector>

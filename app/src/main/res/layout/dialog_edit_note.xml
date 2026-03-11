@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:maxHeight="400dp">
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/noteContentInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minLines="12"
+        android:gravity="top|start"
+        android:inputType="textMultiLine"
+        android:padding="16dp"
+        android:background="@color/leetcode_card"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="14sp"
+        android:hint="Edit note content..." />
+</ScrollView>

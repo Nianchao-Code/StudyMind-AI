@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.StudyMind" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/leetcode_bg</item>
+        <item name="android:navigationBarColor">@color/leetcode_bg</item>
+        <item name="android:windowBackground">@color/leetcode_bg</item>
+        <item name="android:colorBackground">@color/leetcode_bg</item>
+        <item name="colorPrimary">@color/leetcode_primary</item>
+        <item name="colorPrimaryVariant">@color/leetcode_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/leetcode_success</item>
+        <item name="colorSecondaryVariant">@color/leetcode_success</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSurface">@color/leetcode_surface</item>
+        <item name="colorOnSurface">@color/leetcode_text</item>
+        <item name="colorOnSurfaceVariant">@color/leetcode_text_secondary</item>
+        <item name="colorOutline">@color/leetcode_border</item>
+        <item name="colorError">#ff6b6b</item>
+        <item name="colorOnError">@color/white</item>
+    </style>
+</resources>

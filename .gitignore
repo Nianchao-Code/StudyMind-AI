@@ -1,0 +1,27 @@
+# Android
+local.properties
+*.iml
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.hprof
+
+# Python
+backend/__pycache__/
+backend/*.pyc
+backend/.venv/
+backend/venv/
+backend/.env
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
