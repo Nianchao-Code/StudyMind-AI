@@ -1,2 +1,2 @@
 youtube-transcript-api==0.6.3
-# For local FastAPI (main.py): pip install fastapi uvicorn
+pytubefix>=15.0.0

@@ -213,8 +213,10 @@ public class MainActivity extends AppCompatActivity {
 
         discardNote();
         setLoading(true, "Fetching transcript (YouTube)...");
+        String transcriptApiToken = com.studymind.app.BuildConfig.TRANSCRIPT_API_TOKEN;
         String backendUrl = com.studymind.app.BuildConfig.TRANSCRIPT_BACKEND_URL;
-        YouTubeVideoAnalyzer analyzer = new YouTubeVideoAnalyzer(backendUrl);
+        String geminiApiKey = com.studymind.app.BuildConfig.GEMINI_API_KEY;
+        YouTubeVideoAnalyzer analyzer = new YouTubeVideoAnalyzer(transcriptApiToken, backendUrl, geminiApiKey);
         analyzer.analyze(url, new YouTubeVideoAnalyzer.VideoAnalysisCallback() {
             @Override
             public void onProgress(String message) {
@@ -226,7 +228,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     String transcript = result.transcript;
                     if (TextUtils.isEmpty(transcript)) {
-                        showWhisperFallbackDialog(url, videoId);
+                        runWhisperFallbackOrPromptPaste(videoId);
                         return;
                     }
                     lastTitle = result.videoTitle != null ? result.videoTitle : "YouTube Video";
@@ -242,76 +244,40 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onGeminiResult(StructuredNotes notes, ContentAnalysisResult analysis, String title) {
+                runOnUiThread(() -> {
+                    setLoading(false, null);
+                    lastNotes = notes;
+                    lastAnalysis = analysis;
+                    lastTitle = title;
+                    renderModularNotes(notes);
+                    View saveContainer = findViewById(R.id.saveButtonsContainer);
+                    if (saveContainer != null) saveContainer.setVisibility(View.VISIBLE);
+                    lastSourceType = "gemini";
+                    lastSourceRef = videoId;
+                });
+            }
+
+            @Override
             public void onError(Throwable t) {
-                runOnUiThread(() -> showWhisperFallbackDialog(url, videoId));
+                runOnUiThread(() -> runWhisperFallbackOrPromptPaste(videoId));
             }
         });
     }
 
-    private void showWhisperFallbackDialog(String url, String videoId) {
+    /** When transcript fails: prompt user to download video themselves or paste manually. */
+    private void runWhisperFallbackOrPromptPaste(String videoId) {
         setLoading(false, null);
-        String apiKey = com.studymind.app.BuildConfig.OPENAI_API_KEY;
-        if (apiKey == null || apiKey.isEmpty()) {
-            Toast.makeText(this, "No transcript. Add OPENAI_API_KEY for Whisper fallback, or paste transcript below.", Toast.LENGTH_LONG).show();
-            return;
-        }
         new MaterialAlertDialogBuilder(this)
                 .setTitle("No transcript available")
-                .setMessage("Tried Piped, YouTube, and watch page—no captions found.\n\nDownload audio and transcribe with Whisper? (Requires download)")
-                .setPositiveButton("Download & transcribe", (d, w) -> runWhisperFallback(videoId))
-                .setNegativeButton("Paste manually", (d, w) -> {
+                .setMessage("Could not get transcript or analyze this video.\n\nPlease download the video yourself and import it via Import Audio/Video for analysis, or paste the transcript below.")
+                .setPositiveButton("Paste transcript", (d, w) -> {
                     TextInputEditText pasteInput = findViewById(R.id.pasteInput);
-                    if (pasteInput != null) pasteInput.getText().clear();
+                    if (pasteInput != null) pasteInput.requestFocus();
                     Toast.makeText(this, "Paste the video transcript below, then tap Generate Notes.", Toast.LENGTH_LONG).show();
                 })
+                .setNegativeButton("OK", null)
                 .show();
-    }
-
-    private void runWhisperFallback(String videoId) {
-        String apiKey = com.studymind.app.BuildConfig.OPENAI_API_KEY;
-        if (apiKey == null || apiKey.isEmpty()) return;
-        setLoading(true, "Downloading audio file…");
-        new com.studymind.app.youtube.YouTubeAudioExtractor().extractAudio(this, videoId,
-                new com.studymind.app.youtube.YouTubeAudioExtractor.ExtractCallback() {
-                    @Override
-                    public void onSuccess(Uri audioUri, String fileName) {
-                        runOnUiThread(() -> {
-                            setLoading(true, "Transcribing with Whisper…");
-                            lastTitle = "YouTube Video";
-                            lastSourceType = "whisper";
-                            lastSourceRef = videoId;
-                            WhisperApiClient whisper = new WhisperApiClient(apiKey);
-                            whisper.transcribe(MainActivity.this, audioUri, fileName, new WhisperApiClient.TranscribeCallback() {
-                                @Override
-                                public void onSuccess(String transcript) {
-                                    runOnUiThread(() -> {
-                                        if (TextUtils.isEmpty(transcript)) {
-                                            setLoading(false, null);
-                                            Toast.makeText(MainActivity.this, "No speech detected", Toast.LENGTH_LONG).show();
-                                            return;
-                                        }
-                                        setLoading(true, "Generating notes…");
-                                        runPipeline(transcript, lastTitle, "whisper", videoId);
-                                    });
-                                }
-                                @Override
-                                public void onError(Throwable t) {
-                                    runOnUiThread(() -> {
-                                        setLoading(false, null);
-                                        Toast.makeText(MainActivity.this, "Whisper failed: " + t.getMessage(), Toast.LENGTH_LONG).show();
-                                    });
-                                }
-                            });
-                        });
-                    }
-                    @Override
-                    public void onError(Throwable t) {
-                        runOnUiThread(() -> {
-                            setLoading(false, null);
-                            Toast.makeText(MainActivity.this, "Could not extract audio. Paste transcript manually below.", Toast.LENGTH_LONG).show();
-                        });
-                    }
-                });
     }
 
     private void runPastedAnalysis(TextInputEditText input) {
