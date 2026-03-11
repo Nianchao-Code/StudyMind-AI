@@ -49,6 +49,9 @@ def get_transcript(video_id: str) -> dict:
             return {"error": "YouTube transcript unavailable for this video", "status": 404}
         if "transcript" in err_msg.lower() and ("disabled" in err_msg.lower() or "not found" in err_msg.lower() or "unavailable" in err_msg.lower()):
             return {"error": err_msg, "status": 404}
+        # 429 Too Many Requests = rate limited by YouTube
+        if "429" in err_msg or "too many requests" in err_msg.lower():
+            return {"error": "Rate limited. Please wait a few minutes and try again.", "status": 429}
         return {"error": err_msg, "status": 500}
 
 
