@@ -35,22 +35,21 @@ def get_transcript(video_id: str) -> dict:
         if "error" not in r:
             pass  # fall through to youtube-transcript-api
 
-    # 2. Fallback: youtube-transcript-api
+    # 2. Fallback: youtube-transcript-api (1.2.x: fetch() returns FetchedTranscript)
     from youtube_transcript_api import YouTubeTranscriptApi
-    from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
 
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-        text = " ".join(item["text"].strip() for item in transcript_list if item.get("text"))
+        fetched = YouTubeTranscriptApi().fetch(video_id)
+        text = " ".join(s.text.strip() for s in fetched if s.text)
         return {"video_id": video_id, "transcript": text}
-    except TranscriptsDisabled:
-        return {"error": "Transcripts disabled for this video", "status": 404}
-    except NoTranscriptFound:
-        return {"error": "No transcript found", "status": 404}
-    except VideoUnavailable:
-        return {"error": "Video unavailable", "status": 404}
     except Exception as e:
-        return {"error": str(e), "status": 500}
+        err_msg = str(e)
+        # "no element found: line 1, column 0" = YouTube returned empty/invalid XML
+        if "no element found" in err_msg.lower() or "line 1, column 0" in err_msg:
+            return {"error": "YouTube transcript unavailable for this video", "status": 404}
+        if "transcript" in err_msg.lower() and ("disabled" in err_msg.lower() or "not found" in err_msg.lower() or "unavailable" in err_msg.lower()):
+            return {"error": err_msg, "status": 404}
+        return {"error": err_msg, "status": 500}
 
 
 def _to_text(val) -> str:
