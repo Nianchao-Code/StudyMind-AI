@@ -2,12 +2,12 @@
 
 ## 一、安装 Railway CLI
 
-**Windows (PowerShell):**
+**Windows (无 Node.js):** 下载 [Releases](https://github.com/railwayapp/cli/releases) 中 `railway-v*-x86_64-pc-windows-msvc.zip`，解压到 `C:\railway`，然后执行：
 ```powershell
-iwr https://railway.com/install.ps1 | iex
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\railway", "User")
 ```
 
-**或使用 npm:**
+**npm (需 Node.js):**
 ```bash
 npm install -g @railway/cli
 ```
