@@ -28,8 +28,7 @@ import okhttp3.Response;
  */
 public class WhisperApiClient {
     private static final String API_URL = "https://api.openai.com/v1/audio/transcriptions";
-    private static final long MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (direct API)
-    private static final long MAX_FILE_SIZE_BACKEND = 3 * 1024 * 1024; // 3 MB (backend/Vercel limit)
+    private static final long MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB (OpenAI Whisper limit)
 
     private final String apiKey;
     private final String backendBaseUrl;
@@ -63,12 +62,8 @@ public class WhisperApiClient {
         executor.execute(() -> {
             try {
                 long fileSize = getFileSize(context, audioUri);
-                long limit = backendBaseUrl != null ? MAX_FILE_SIZE_BACKEND : MAX_FILE_SIZE;
+                long limit = MAX_FILE_SIZE;
                 if (fileSize > limit) {
-                    if (backendBaseUrl != null) {
-                        runOnMain(() -> callback.onError(new IOException("Audio too large for backend (max 3MB). Use shorter clip.")));
-                        return;
-                    }
                     transcribeChunked(context, audioUri, fileName, callback);
                 } else {
                     transcribeSingle(context, audioUri, fileName, callback);
