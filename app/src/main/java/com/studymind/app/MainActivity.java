@@ -275,6 +275,9 @@ public class MainActivity extends AppCompatActivity {
         String msg = "Could not get transcript or analyze this video.";
         if (errMsg != null && !errMsg.isEmpty()) {
             msg += "\n\nError: " + (errMsg.length() > 150 ? errMsg.substring(0, 150) + "…" : errMsg);
+            if (errMsg.toLowerCase().contains("gemini") && errMsg.toLowerCase().contains("configure")) {
+                msg += "\n\nTip: Add GEMINI_API_KEY in Vercel → Settings → Environment Variables.";
+            }
         }
         msg += "\n\nPlease download the video yourself and import it via Import Audio/Video, or paste the transcript below.";
         new MaterialAlertDialogBuilder(this)
