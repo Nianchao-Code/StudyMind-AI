@@ -34,8 +34,11 @@ def get_transcript(video_id: str) -> dict:
             return {"video_id": video_id, "transcript": r["transcript"]}
         if "error" not in r:
             pass  # fall through to youtube-transcript-api
+    else:
+        # Token not set - will use free youtube-transcript-api (YouTube rate limits apply)
+        pass
 
-    # 2. Fallback: youtube-transcript-api (1.2.x: fetch() returns FetchedTranscript)
+    # 2. Fallback: youtube-transcript-api (1.2.x) - hits YouTube directly, subject to 429
     from youtube_transcript_api import YouTubeTranscriptApi
 
     try:
@@ -51,7 +54,8 @@ def get_transcript(video_id: str) -> dict:
             return {"error": err_msg, "status": 404}
         # 429 Too Many Requests = rate limited by YouTube
         if "429" in err_msg or "too many requests" in err_msg.lower():
-            return {"error": "Rate limited. Please wait a few minutes and try again.", "status": 429}
+            hint = " Add TRANSCRIPT_API_TOKEN (youtube-transcript.io) in Vercel to use paid API." if not token else ""
+            return {"error": "Rate limited. Please wait a few minutes and try again." + hint, "status": 429}
         return {"error": err_msg, "status": 500}
 
 
