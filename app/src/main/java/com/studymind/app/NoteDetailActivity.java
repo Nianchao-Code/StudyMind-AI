@@ -4,8 +4,10 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.text.Spanned;
 
 import androidx.core.content.FileProvider;
+import androidx.core.text.HtmlCompat;
 import android.graphics.pdf.PdfDocument;
 import android.net.Uri;
 import android.os.Bundle;
@@ -411,10 +413,27 @@ public class NoteDetailActivity extends AppCompatActivity {
                 return;
             }
         }
-        // Fallback: plain text
-        answerText.setText(answer != null ? answer : "");
+        // Fallback: formatted text (markdown-like to readable display)
+        Spanned formatted = formatAnswerForDisplay(answer != null ? answer : "");
+        answerText.setText(formatted);
         answerText.setVisibility(View.VISIBLE);
         answerScroll.setVisibility(View.GONE);
+    }
+
+    /** Converts AI answer (markdown-like) to nicely formatted Spanned for display. */
+    private Spanned formatAnswerForDisplay(String raw) {
+        if (raw == null || raw.isEmpty()) return HtmlCompat.fromHtml("", HtmlCompat.FROM_HTML_MODE_LEGACY);
+        // Escape HTML to prevent injection, then apply formatting
+        String escaped = raw
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+        // Convert markdown-style to HTML
+        String html = escaped
+                .replaceAll("\\*\\*(.+?)\\*\\*", "<b>$1</b>")  // **bold**
+                .replaceAll("\\*([^*]+)\\*", "<i>$1</i>")     // *italic*
+                .replace("\n", "<br>");
+        return HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY);
     }
 
     private void renderCards(java.util.List<FlashcardQuizParser.Card> cards) {

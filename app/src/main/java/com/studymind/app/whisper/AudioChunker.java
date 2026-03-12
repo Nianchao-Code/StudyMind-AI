@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Splits long audio/video into chunks under 25MB for Whisper API.
+ * Splits long audio/video into chunks for Whisper API.
  * Uses MediaExtractor + MediaMuxer (no FFmpeg).
  */
 public class AudioChunker {
@@ -22,7 +22,7 @@ public class AudioChunker {
     private static final long MAX_FILE_BYTES = 24 * 1024 * 1024; // 24 MB (Whisper limit 25MB)
 
     /**
-     * Split audio/video into chunks. Returns list of temp files (caller should delete).
+     * Split audio/video into chunks (10 min each). Returns list of temp files (caller should delete).
      */
     public static List<File> split(Context context, android.net.Uri uri) throws IOException {
         MediaExtractor extractor = new MediaExtractor();

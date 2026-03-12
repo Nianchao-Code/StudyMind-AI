@@ -169,9 +169,11 @@
                         android:id="@+id/answerText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="12dp"
+                        android:padding="16dp"
                         android:background="@color/leetcode_card"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
+                        android:lineSpacingMultiplier="1.35"
+                        android:letterSpacing="0.01"
                         android:visibility="gone" />
                 </FrameLayout>
             </LinearLayout>
