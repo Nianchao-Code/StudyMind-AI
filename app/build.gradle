@@ -18,7 +18,6 @@ android {
         versionCode 1
         versionName "1.0"
 
-        // API Key: Add OPENAI_API_KEY=your_key to local.properties
         def localProps = new Properties()
         def localFile = rootProject.file("local.properties")
         if (localFile.exists()) {
