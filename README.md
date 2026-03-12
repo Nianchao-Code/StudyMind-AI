@@ -50,6 +50,12 @@ Leave `OPENAI_API_KEY` empty—the key stays on the server.
 
 Open in Android Studio, sync Gradle, run on device or emulator.
 
+### 4. Signed APK (for sharing)
+
+Android Studio → **Build** → **Generate Signed Bundle / APK** → APK → Create new keystore (or choose existing) → Release.
+
+APK output: `app/build/outputs/apk/release/app-release.apk`
+
 ## Backend env vars (Railway)
 
 | Variable | Required | Purpose |
