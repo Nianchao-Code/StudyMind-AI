@@ -220,7 +220,7 @@ def gemini_youtube_post(req: GeminiYoutubeRequest):
     body = {
         "contents": [{
             "parts": [
-                {"fileData": {"fileUri": req.url}},
+                {"fileData": {"fileUri": req.url, "mimeType": "video/mp4"}},
                 {"text": f"Video: {req.title or 'YouTube'}\n\n{prompt}"},
             ]
         }],
@@ -275,7 +275,12 @@ def get_audio(video_id: Optional[str] = None, url: Optional[str] = None):
         raise HTTPException(500, str(e))
 
 
-# ----- /health -----
+# ----- / and /health -----
+@app.get("/")
+def root():
+    return {"service": "StudyMind Backend", "docs": "/docs", "health": "/health"}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
