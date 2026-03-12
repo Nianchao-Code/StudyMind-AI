@@ -1,3 +1,14 @@
 ## Copy to local.properties (not committed to git)
 sdk.dir=C\:\\Users\\YOUR_USERNAME\\AppData\\Local\\Android\\Sdk
-TRANSCRIPT_BACKEND_URL=https://your-project.vercel.app/api
+
+# Railway backend (no /api suffix)
+TRANSCRIPT_BACKEND_URL=https://your-project.up.railway.app
+
+# Optional: for direct OpenAI (no backend) - key goes in APK
+# OPENAI_API_KEY=sk-xxx
+
+# Optional: for YouTube transcript.io (reduces 429)
+# TRANSCRIPT_API_TOKEN=xxx
+
+# Optional: for Gemini YouTube fallback (when transcript fails)
+# GEMINI_API_KEY=xxx
