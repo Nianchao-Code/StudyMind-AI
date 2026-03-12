@@ -105,6 +105,31 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, HistoryActivity.class)));
 
         maybeShowOnboarding();
+        handleSharedIntent(getIntent(), youtubeUrlInput);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        TextInputEditText youtubeUrlInput = findViewById(R.id.youtubeUrlInput);
+        if (youtubeUrlInput != null) handleSharedIntent(intent, youtubeUrlInput);
+    }
+
+    /** Handle Share from YouTube: user taps Share → StudyMind AI. */
+    private void handleSharedIntent(Intent intent, TextInputEditText youtubeUrlInput) {
+        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
+        String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+        if (TextUtils.isEmpty(sharedText)) sharedText = intent.getStringExtra(Intent.EXTRA_SUBJECT);
+        if (TextUtils.isEmpty(sharedText)) return;
+
+        String url = sharedText.trim();
+        String videoId = YouTubeVideoAnalyzer.extractVideoId(url);
+        if (videoId == null) return;
+
+        url = YouTubeVideoAnalyzer.normalizeUrl(url);
+        if (youtubeUrlInput != null) youtubeUrlInput.setText(url);
+        runYouTubeAnalysis(youtubeUrlInput);
     }
 
     private void maybeShowOnboarding() {
