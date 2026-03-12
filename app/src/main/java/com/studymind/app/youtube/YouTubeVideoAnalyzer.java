@@ -78,9 +78,27 @@ public class YouTubeVideoAnalyzer {
      * Analyze a YouTube video: fetch metadata + transcript, then run content analysis.
      */
     public void analyze(String youtubeUrl, VideoAnalysisCallback callback) {
+        analyze(youtubeUrl, false, callback);
+    }
+
+    /**
+     * Analyze a YouTube video with optional preference for Gemini (visual analysis).
+     * @param preferGemini true = skip transcript, use Gemini directly (for videos with formulas/diagrams)
+     */
+    public void analyze(String youtubeUrl, boolean preferGemini, VideoAnalysisCallback callback) {
         String videoId = extractVideoId(youtubeUrl);
         if (videoId == null) {
             callback.onError(new IllegalArgumentException("Invalid YouTube URL"));
+            return;
+        }
+
+        if (preferGemini && geminiAnalyzer != null) {
+            if (YouTubeClient.hasApiKey()) {
+                callback.onProgress("Fetching video metadata...");
+                fetchVideoTitle(videoId, title -> tryGemini(youtubeUrl, title, callback));
+            } else {
+                tryGemini(youtubeUrl, null, callback);
+            }
             return;
         }
 
@@ -143,7 +161,7 @@ public class YouTubeVideoAnalyzer {
                 public void onError(Throwable t) {
                     String msg = t != null ? t.getMessage() : "";
                     callback.onProgress("Backend failed: " + msg);
-                    // 429/403/500: transcript 不可用，直接走 Gemini（Innertube/WatchPage 也可能失败）
+                    // 429/403/500: transcript unavailable, go to Gemini (Innertube/WatchPage may also fail)
                     if (msg != null && (msg.contains("429") || msg.contains("403") || msg.contains("500")
                             || msg.toLowerCase().contains("too many requests") || msg.toLowerCase().contains("forbidden"))) {
                         tryGemini(youtubeUrl, titleHint, callback);

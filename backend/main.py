@@ -208,11 +208,22 @@ def gemini_youtube_post(req: GeminiYoutubeRequest):
     if not key:
         raise HTTPException(500, "GEMINI_API_KEY not configured")
 
+    # Same prompt as SummarizationAgent.getVideoAnalysisPrompt() - must match transcript format
     prompt = (
-        "You are StudyMind AI. Analyze this YouTube video and create EXAM-FOCUSED structured notes. "
-        "Output ONLY valid JSON (use \\n for newlines), no markdown:\n"
+        "You are StudyMind AI. Create EXAM-FOCUSED notes (key exam points + summary), NOT generic definitions. "
+        "Rules: NO DUPLICATION—each concept appears ONCE. No redundancy. Never use N/A. "
+        "Use • Main topic\\n  - sub-point\\n  - sub-point for ALL sections. 2–4 main topics per section, 1–3 sub-points each. "
+        "FOCUS: testable points—specific, actionable, exam-relevant. "
+        "Respond ONLY with valid JSON (use \\n for newlines):\n"
         '{"keyDefinitions":"...","coreConcepts":"...","importantFormulas":"...","commonPitfalls":"...","quickReview":"..."}\n'
-        "MUST populate ALL 5 sections. Use • for main topics and - for sub-points."
+        "keyDefinitions: • Term\\n  - specific definition\\n  - exam tip.\n"
+        "coreConcepts: • Concept\\n  - mechanism\\n  - exam-frequent point. Merge similar concepts.\n"
+        "importantFormulas: • Topic\\n  - when to use\\n  - key syntax.\n"
+        "commonPitfalls: • Category\\n  - wrong answer\\n  - correct approach.\n"
+        "quickReview: • Topic\\n  - exam key point. 5–7 concepts max.\n"
+        "VIDEO MODE: Analyze the video (formulas, diagrams, code on screen). "
+        "STRICT: 2–4 main topics per section, 1–3 sub-points each. MERGE related terms into ONE topic. "
+        "Do NOT list each term as a separate topic. No markdown. Same structure as transcript."
     )
 
     import urllib.request
@@ -228,7 +239,7 @@ def gemini_youtube_post(req: GeminiYoutubeRequest):
     }
 
     req_obj = urllib.request.Request(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}",
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"},
         method="POST",

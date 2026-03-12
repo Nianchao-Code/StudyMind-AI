@@ -18,25 +18,16 @@ import okhttp3.Response;
 
 import com.studymind.app.agent.ContentAnalysisResult;
 import com.studymind.app.agent.StructuredNotes;
+import com.studymind.app.agent.SummarizationAgent;
 import com.studymind.app.agent.SummarizationStrategy;
 
 /**
  * Analyzes YouTube videos via Gemini (direct or backend proxy).
- * Fallback when transcript fetching fails.
+ * Uses same prompt format as SummarizationAgent for identical output.
  */
 public class GeminiYouTubeAnalyzer {
-    private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-
-    private static final String PROMPT = "You are StudyMind AI. Analyze this YouTube video and create EXAM-FOCUSED structured notes. "
-            + "Output ONLY valid JSON (use \\n for newlines), no markdown:\n"
-            + "{\"keyDefinitions\":\"...\",\"coreConcepts\":\"...\",\"importantFormulas\":\"...\",\"commonPitfalls\":\"...\",\"quickReview\":\"...\"}\n"
-            + "keyDefinitions: Exam-relevant terms. • Term\\n  - definition\\n  - exam tip.\n"
-            + "coreConcepts: Core ideas with 考点. • Concept\\n  - mechanism\\n  - exam point.\n"
-            + "importantFormulas: Formulas/code. • Topic\\n  - when to use\\n  - key syntax.\n"
-            + "commonPitfalls: Exam mistakes. • Category\\n  - wrong answer\\n  - correct approach.\n"
-            + "quickReview: 考点总结—5–7 concepts. • Topic\\n  - key point.\n"
-            + "MUST populate ALL 5 sections. Never use N/A. Use • for main topics and - for sub-points.";
 
     private final String backendBaseUrl;
     private final String geminiApiKey;
@@ -123,9 +114,10 @@ public class GeminiYouTubeAnalyzer {
         fileDataPart.add("fileData", fileData);
         parts.add(fileDataPart);
 
-        // Part 2: prompt
+        // Part 2: prompt (same format as transcript via SummarizationAgent)
         JsonObject textPart = new JsonObject();
-        textPart.addProperty("text", "Video: " + (title != null ? title : "YouTube") + "\n\n" + PROMPT);
+        textPart.addProperty("text", "Video: " + (title != null ? title : "YouTube") + "\n\n"
+                + "Convert this video into structured exam notes. Same output format as transcript.\n\n" + SummarizationAgent.getVideoAnalysisPrompt());
         parts.add(textPart);
 
         content.add("parts", parts);

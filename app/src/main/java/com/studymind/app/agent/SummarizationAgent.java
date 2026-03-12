@@ -11,18 +11,25 @@ import java.util.regex.Pattern;
 public class SummarizationAgent {
     private static final String HIERARCHY_FORMAT = "Use • Main topic\\n  - sub-point\\n  - sub-point for ALL sections. Main topic = bold header, sub-points = details. 2–4 main topics per section, 1–3 sub-points each.";
     private static final String MERGE_RULE = "MERGE RULE—treat as ONE concept, output ONCE: ContentProvider/Content Providers/Content Provider; ContentObserver/Content Observer; ContentResolver/Content Resolver; Content URI/ContentUri. Use canonical form (e.g. Content Provider). ";
-    private static final String BASE_SYSTEM = "You are StudyMind AI. Create EXAM-FOCUSED notes—考点总结 (key exam points + summary), NOT generic definitions. "
+    private static final String BASE_SYSTEM = "You are StudyMind AI. Create EXAM-FOCUSED notes (key exam points + summary), NOT generic definitions. "
             + "Rules: NO DUPLICATION—each concept appears ONCE per module. " + MERGE_RULE + "No redundancy. Never use N/A. "
-            + "FOCUS: 考点 (testable points)—specific, actionable, exam-relevant. NOT vague like \"allows data sharing\". Include: how it works, key APIs, common exam questions. "
+            + "FOCUS: testable points—specific, actionable, exam-relevant. NOT vague like \"allows data sharing\". Include: how it works, key APIs, common exam questions. "
             + "STRUCTURE: " + HIERARCHY_FORMAT + " "
             + "CODE RULE: When including code snippets, ALWAYS add a one-line explanation before or after—what it does, key params. Never paste code without context.\n"
             + "Respond ONLY with valid JSON (use \\n for newlines):\n"
             + "{\"keyDefinitions\":\"...\",\"coreConcepts\":\"...\",\"importantFormulas\":\"...\",\"commonPitfalls\":\"...\",\"quickReview\":\"...\"}\n"
             + "keyDefinitions: Exam-relevant terms. • Term\\n  - specific definition\\n  - exam tip. ONE entry per concept—ContentProvider=Content Provider (merge). ContentObserver=Content Observer (merge).\n"
-            + "coreConcepts: Core ideas with 考点. • Concept\\n  - specific mechanism\\n  - exam-frequent point. Merge similar concepts.\n"
+            + "coreConcepts: Core ideas with exam points. • Concept\\n  - specific mechanism\\n  - exam-frequent point. Merge similar concepts.\n"
             + "importantFormulas: Formulas/code. • Topic\\n  - when to use\\n  - key syntax. For code: snippet + exam context.\n"
             + "commonPitfalls: Exam mistakes. • Category\\n  - specific wrong answer\\n  - correct approach. No generic advice.\n"
-            + "quickReview: 考点总结—5–7 distinct concepts max. • Topic\\n  - exam key point\\n  - exam key point. MERGE duplicates (Content Provider + Content Providers = one).";
+            + "quickReview: Key exam points—5–7 distinct concepts max. • Topic\\n  - exam key point\\n  - exam key point. MERGE duplicates (Content Provider + Content Providers = one).";
+
+    /** Shared prompt for video analysis (Gemini). Must produce identical format to transcript. */
+    public static String getVideoAnalysisPrompt() {
+        return BASE_SYSTEM + " VIDEO MODE: Analyze the video (formulas, diagrams, code on screen). "
+                + "STRICT: 2–4 main topics per section, 1–3 sub-points each. MERGE related terms into ONE topic with multiple sub-points. "
+                + "Do NOT list each term as a separate topic. No markdown (no ** or ##). Same structure as transcript.";
+    }
 
     private static final String MATH_EXTRA = " Emphasize formulas. Use LaTeX in sub-points.";
     private static final String ALGORITHM_EXTRA = " Emphasize complexity and key steps in sub-points.";
