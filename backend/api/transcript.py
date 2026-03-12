@@ -32,8 +32,12 @@ def get_transcript(video_id: str) -> dict:
         r = _fetch_from_transcript_io(video_id, token)
         if r.get("transcript"):
             return {"video_id": video_id, "transcript": r["transcript"]}
-        if "error" not in r:
-            pass  # fall through to youtube-transcript-api
+        if r.get("error"):
+            # transcript.io 返回错误（401/429等），直接返回，不要 fallback 到 YouTube
+            err = r["error"]
+            status = 429 if "429" in err or "too many" in err.lower() else 500
+            return {"error": f"Transcript.io: {err}", "status": status}
+        # r 为空 {}：该视频在 transcript.io 无结果，fallback 到 YouTube
     else:
         # Token not set - will use free youtube-transcript-api (YouTube rate limits apply)
         pass
