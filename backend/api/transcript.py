@@ -75,6 +75,7 @@ def _fetch_from_transcript_io(video_id: str, token: str) -> dict:
     import base64
     import urllib.request
 
+    # Basic auth: token as username, empty password. Some APIs also require X-Telemetry-Id.
     auth = base64.b64encode((token + ":").encode()).decode()
     body = json.dumps({"ids": [video_id]}).encode()
     req = urllib.request.Request(
@@ -83,6 +84,8 @@ def _fetch_from_transcript_io(video_id: str, token: str) -> dict:
         headers={
             "Authorization": f"Basic {auth}",
             "Content-Type": "application/json",
+            "X-Telemetry-Id": "9821-b",
+            "User-Agent": "StudyMind/1.0",
         },
         method="POST",
     )
