@@ -1,6 +1,6 @@
 """
 StudyMind Backend - Unified API for Railway / any Python host.
-Endpoints: /transcript, /whisper, /gemini_youtube, /audio, /health
+Endpoints: /transcript, /whisper, /summarize, /gemini_youtube, /audio, /health
 """
 import json
 import os
@@ -121,6 +121,42 @@ def get_transcript(url: Optional[str] = None, video_id: Optional[str] = None):
         if "disabled" in err_msg.lower() or "not found" in err_msg.lower():
             raise HTTPException(404, err_msg)
         raise HTTPException(500, err_msg)
+
+
+# ----- /summarize -----
+class SummarizeRequest(BaseModel):
+    prompt: str
+    systemPrompt: Optional[str] = None
+
+
+@app.post("/summarize")
+def summarize_post(req: SummarizeRequest):
+    """Proxy to OpenAI chat for note generation. Used by BackendAIApiClient."""
+    key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(500, "OPENAI_API_KEY not configured")
+
+    import requests
+
+    messages = []
+    if req.systemPrompt:
+        messages.append({"role": "system", "content": req.systemPrompt})
+    messages.append({"role": "user", "content": req.prompt})
+
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"model": "gpt-4o-mini", "messages": messages, "max_tokens": 4096},
+            timeout=300,
+        )
+        r.raise_for_status()
+        data = r.json()
+        choice = data.get("choices", [{}])[0]
+        text = choice.get("message", {}).get("content", "")
+        return {"response": text}
+    except requests.RequestException as e:
+        raise HTTPException(500, str(e))
 
 
 # ----- /whisper -----
