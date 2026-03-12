@@ -72,17 +72,15 @@ def _to_text(val) -> str:
 
 
 def _fetch_from_transcript_io(video_id: str, token: str) -> dict:
-    import base64
     import urllib.request
 
-    # Basic auth: token as username, empty password. Some APIs also require X-Telemetry-Id.
-    auth = base64.b64encode((token + ":").encode()).decode()
+    # transcript.io: "Basic <your-api-token>" — token as-is, no base64
     body = json.dumps({"ids": [video_id]}).encode()
     req = urllib.request.Request(
         "https://www.youtube-transcript.io/api/transcripts",
         data=body,
         headers={
-            "Authorization": f"Basic {auth}",
+            "Authorization": f"Basic {token}",
             "Content-Type": "application/json",
             "X-Telemetry-Id": "9821-b",
             "User-Agent": "StudyMind/1.0",
