@@ -19,7 +19,8 @@ public class StudyMindApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
+        boolean dark = getSharedPreferences("studymind", MODE_PRIVATE).getBoolean("theme_dark", true);
+        AppCompatDelegate.setDefaultNightMode(dark ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
         String backendUrl = BuildConfig.TRANSCRIPT_BACKEND_URL;
         String openaiKey = BuildConfig.OPENAI_API_KEY;
 

@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.view.Menu;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -78,7 +79,15 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        setSupportActionBar(findViewById(R.id.toolbar));
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_settings) {
+                startActivity(new Intent(this, SettingsActivity.class));
+                return true;
+            }
+            return false;
+        });
         repository = new NoteRepository(this);
 
         progressBar = findViewById(R.id.progressBar);
@@ -106,6 +115,12 @@ public class MainActivity extends AppCompatActivity {
 
         maybeShowOnboarding();
         handleSharedIntent(getIntent(), youtubeUrlInput);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
     }
 
     @Override
@@ -222,6 +237,9 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
+    private static final String PREF_YOUTUBE_REMEMBER_VISUAL = "youtube_remember_visual_choice";
+    private static final String PREF_YOUTUBE_PREFER_GEMINI = "youtube_prefer_gemini";
+
     private void runYouTubeAnalysis(TextInputEditText input) {
         String url = input != null && input.getText() != null ? input.getText().toString().trim() : "";
         if (TextUtils.isEmpty(url)) {
@@ -238,14 +256,57 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        SharedPreferences prefs = getSharedPreferences("studymind", MODE_PRIVATE);
+        if (prefs.getBoolean(PREF_YOUTUBE_REMEMBER_VISUAL, false)) {
+            boolean preferGemini = prefs.getBoolean(PREF_YOUTUBE_PREFER_GEMINI, false);
+            startYouTubeAnalysisWithChoice(url, videoId, input, preferGemini);
+            return;
+        }
+
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_youtube_visual_choice, null);
+        TextView msg = dialogView.findViewById(R.id.dialogMessage);
+        msg.setText("Does this video have formulas, diagrams, or charts?\n\nAnalyzing visuals gives better results for STEM content.");
+        com.google.android.material.checkbox.MaterialCheckBox rememberCb = dialogView.findViewById(R.id.rememberChoice);
+        TextView hint = dialogView.findViewById(R.id.dialogHint);
+        hint.setText("You can change this later in Settings → YouTube.");
+
+        final String finalUrl = url;
+        final String finalVideoId = videoId;
+        final TextInputEditText finalInput = input;
+        androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("YouTube analysis")
+                .setView(dialogView)
+                .setCancelable(true)
+                .create();
+
+        dialogView.findViewById(R.id.optionTranscript).setOnClickListener(v -> {
+            if (rememberCb.isChecked()) {
+                prefs.edit().putBoolean(PREF_YOUTUBE_REMEMBER_VISUAL, true)
+                        .putBoolean(PREF_YOUTUBE_PREFER_GEMINI, false).apply();
+            }
+            dialog.dismiss();
+            startYouTubeAnalysisWithChoice(finalUrl, finalVideoId, finalInput, false);
+        });
+        dialogView.findViewById(R.id.optionVisuals).setOnClickListener(v -> {
+            if (rememberCb.isChecked()) {
+                prefs.edit().putBoolean(PREF_YOUTUBE_REMEMBER_VISUAL, true)
+                        .putBoolean(PREF_YOUTUBE_PREFER_GEMINI, true).apply();
+            }
+            dialog.dismiss();
+            startYouTubeAnalysisWithChoice(finalUrl, finalVideoId, finalInput, true);
+        });
+        dialog.show();
+    }
+
+    private void startYouTubeAnalysisWithChoice(String url, String videoId, TextInputEditText input, boolean preferGemini) {
         discardNote();
-        setLoading(true, "Fetching transcript (YouTube)...");
+        setLoading(true, preferGemini ? "Analyzing video with AI..." : "Fetching transcript (YouTube)...");
         String transcriptApiToken = com.studymind.app.BuildConfig.TRANSCRIPT_API_TOKEN;
         String backendUrl = com.studymind.app.BuildConfig.TRANSCRIPT_BACKEND_URL;
         String geminiApiKey = com.studymind.app.BuildConfig.GEMINI_API_KEY;
-        Log.i("StudyMind", "YouTube analysis: videoId=" + videoId + " backend=" + (backendUrl != null && !backendUrl.isEmpty()) + " transcriptApi=" + (transcriptApiToken != null && !transcriptApiToken.isEmpty()));
+        Log.i("StudyMind", "YouTube analysis: videoId=" + videoId + " preferGemini=" + preferGemini);
         YouTubeVideoAnalyzer analyzer = new YouTubeVideoAnalyzer(transcriptApiToken, backendUrl, geminiApiKey);
-        analyzer.analyze(url, new YouTubeVideoAnalyzer.VideoAnalysisCallback() {
+        analyzer.analyze(url, preferGemini, new YouTubeVideoAnalyzer.VideoAnalysisCallback() {
             @Override
             public void onProgress(String message) {
                 runOnUiThread(() -> setLoading(true, message));
@@ -404,6 +465,9 @@ public class MainActivity extends AppCompatActivity {
     private String cleanSectionContent(String s) {
         if (s == null) return "";
         s = s.trim();
+        // Remove markdown that breaks bullet parsing (**bold**, ## headers)
+        s = s.replaceAll("\\*\\*([^*]+)\\*\\*", "$1");
+        s = s.replaceAll("(?m)^#+\\s*", "");
         // Remove leading N/A
         s = s.replaceFirst("^(?i)N/A\\s*([-:]\\s*[^\\n]*)?[\\n\\r]*", "");
         // Remove N/A on its own line anywhere in content

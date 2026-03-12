@@ -13,7 +13,8 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="StudyMind AI" />
+            app:title="StudyMind AI"
+            app:menu="@menu/menu_main" />
     </com.google.android.material.appbar.AppBarLayout>
 
         <ScrollView
