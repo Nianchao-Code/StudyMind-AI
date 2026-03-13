@@ -51,14 +51,6 @@
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:textColor="?attr/colorOnSurface" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Use captions"
-                    android:textSize="12sp"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:maxLines="1" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -91,14 +83,6 @@
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:textColor="@color/leetcode_primary" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Formulas, diagrams"
-                    android:textSize="12sp"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:maxLines="1" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
