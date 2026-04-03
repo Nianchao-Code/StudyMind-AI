@@ -135,8 +135,13 @@ public class WhisperApiClient {
         }
     }
 
-    private String doTranscribeBlocking(byte[] bytes, String fileName, String mimeType) throws IOException {
-        if (backendBaseUrl != null) {
+    /* package */ String doTranscribeBlocking(byte[] bytes, String fileName, String mimeType) throws IOException {
+        return doTranscribeBlocking(bytes, fileName, mimeType, API_URL);
+    }
+
+    /** Overload accepting a custom URL — used for testing with MockWebServer. */
+    /* package */ String doTranscribeBlocking(byte[] bytes, String fileName, String mimeType, String url) throws IOException {
+        if (backendBaseUrl != null && url.equals(API_URL)) {
             return doTranscribeViaBackend(bytes, fileName, mimeType);
         }
         RequestBody fileBody = RequestBody.create(bytes, MediaType.parse(mimeType));
@@ -147,7 +152,7 @@ public class WhisperApiClient {
                 .addFormDataPart("response_format", "json")
                 .build();
         Request request = new Request.Builder()
-                .url(API_URL)
+                .url(url)
                 .addHeader("Authorization", "Bearer " + apiKey)
                 .post(body)
                 .build();
