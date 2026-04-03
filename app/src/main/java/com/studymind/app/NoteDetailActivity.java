@@ -102,8 +102,13 @@ public class NoteDetailActivity extends AppCompatActivity {
         bottomSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
             public void onStateChanged(@NonNull View sheet, int newState) {
-                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
+                if (newState == BottomSheetBehavior.STATE_HIDDEN
+                        || newState == BottomSheetBehavior.STATE_COLLAPSED) {
+                    fab.show();
                     fab.extend();
+                } else {
+                    // Hide FAB while bottom sheet is open so it doesn't cover the input
+                    fab.hide();
                 }
             }
             @Override public void onSlide(@NonNull View sheet, float offset) {}
