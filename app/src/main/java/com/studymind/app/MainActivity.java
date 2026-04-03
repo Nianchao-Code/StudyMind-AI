@@ -98,15 +98,31 @@ public class MainActivity extends AppCompatActivity {
         TextInputEditText youtubeUrlInput = findViewById(R.id.youtubeUrlInput);
         TextInputEditText pasteInput = findViewById(R.id.pasteInput);
 
-        View btnImportPdf = findViewById(R.id.btnImportPdf);
         View btnAnalyzeYouTube = findViewById(R.id.btnAnalyzeYouTube);
         View btnAnalyzePasted = findViewById(R.id.btnAnalyzePasted);
 
-        btnImportPdf.setOnClickListener(v -> pdfPicker.launch(new String[]{"application/pdf"}));
-        findViewById(R.id.btnRecordVoice).setOnClickListener(v -> startVoiceRecording());
-        findViewById(R.id.btnImportAudio).setOnClickListener(v -> audioPicker.launch(new String[]{
+        // Card-based input grid: each card triggers its action or reveals a panel
+        findViewById(R.id.cardImportPdf).setOnClickListener(v -> pdfPicker.launch(new String[]{"application/pdf"}));
+        findViewById(R.id.cardRecordVoice).setOnClickListener(v -> startVoiceRecording());
+        findViewById(R.id.cardImportAudio).setOnClickListener(v -> audioPicker.launch(new String[]{
                 "audio/*", "video/*"
         }));
+        findViewById(R.id.cardYouTube).setOnClickListener(v -> {
+            View panel = findViewById(R.id.youtubeInputPanel);
+            View pastePanel = findViewById(R.id.pasteInputPanel);
+            pastePanel.setVisibility(View.GONE);
+            panel.setVisibility(panel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+        });
+        findViewById(R.id.cardPasteText).setOnClickListener(v -> {
+            View panel = findViewById(R.id.pasteInputPanel);
+            View ytPanel = findViewById(R.id.youtubeInputPanel);
+            ytPanel.setVisibility(View.GONE);
+            panel.setVisibility(panel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+        });
+
+        // Hidden buttons kept for compatibility with setButtonsEnabled()
+        findViewById(R.id.btnRecordVoice).setOnClickListener(v -> startVoiceRecording());
+
         btnAnalyzeYouTube.setOnClickListener(v -> runYouTubeAnalysis(youtubeUrlInput));
         btnAnalyzePasted.setOnClickListener(v -> runPastedAnalysis(pasteInput));
         findViewById(R.id.btnSaveNote).setOnClickListener(v -> saveNote());
@@ -683,6 +699,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setButtonsEnabled(boolean enabled) {
+        // Card-based input grid
+        findViewById(R.id.cardImportPdf).setEnabled(enabled);
+        findViewById(R.id.cardImportPdf).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardRecordVoice).setEnabled(enabled);
+        findViewById(R.id.cardRecordVoice).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardImportAudio).setEnabled(enabled);
+        findViewById(R.id.cardImportAudio).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardYouTube).setEnabled(enabled);
+        findViewById(R.id.cardYouTube).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardPasteText).setEnabled(enabled);
+        findViewById(R.id.cardPasteText).setAlpha(enabled ? 1f : 0.5f);
+        // Hidden legacy buttons + input panel buttons
         findViewById(R.id.btnImportPdf).setEnabled(enabled);
         findViewById(R.id.btnImportAudio).setEnabled(enabled);
         findViewById(R.id.btnRecordVoice).setEnabled(enabled);
