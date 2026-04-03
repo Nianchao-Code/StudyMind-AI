@@ -27,7 +27,9 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.textfield.TextInputEditText;
 import androidx.core.content.ContextCompat;
 import com.studymind.app.agent.FlashcardQuizParser;
@@ -48,6 +50,7 @@ public class NoteDetailActivity extends AppCompatActivity {
     private View answerLoading;
     private View answerScroll;
     private LinearLayout cardsContainer;
+    private BottomSheetBehavior<View> bottomSheetBehavior;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +81,33 @@ public class NoteDetailActivity extends AppCompatActivity {
         }
         repository = new NoteRepository(this);
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
+
+        // FAB + Bottom Sheet for Q&A
+        View bottomSheet = findViewById(R.id.bottomSheetContainer);
+        bottomSheetBehavior = BottomSheetBehavior.from(bottomSheet);
+        bottomSheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
+
+        ExtendedFloatingActionButton fab = findViewById(R.id.fabAskAI);
+        fab.setOnClickListener(v -> {
+            if (bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_HIDDEN
+                || bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_COLLAPSED) {
+                bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                fab.shrink();
+            } else {
+                bottomSheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
+                fab.extend();
+            }
+        });
+
+        bottomSheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View sheet, int newState) {
+                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
+                    fab.extend();
+                }
+            }
+            @Override public void onSlide(@NonNull View sheet, float offset) {}
+        });
 
         findViewById(R.id.btnAsk).setOnClickListener(v -> askQuestion());
         findViewById(R.id.chipExplain).setOnClickListener(v -> askQuestion("Explain the key concepts in simple terms."));

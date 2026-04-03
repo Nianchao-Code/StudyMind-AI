@@ -17,11 +17,14 @@
             app:navigationIcon="?attr/homeAsUpIndicator" />
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- Main scrollable note content -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:paddingBottom="72dp"
+        android:clipToPadding="false">
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -41,6 +44,37 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
+                <!-- Note metadata: tags area -->
+                <LinearLayout
+                    android:id="@+id/noteMetaContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+
+                    <TextView
+                        android:id="@+id/noteSourceBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="11sp"
+                        android:textAllCaps="true"
+                        android:letterSpacing="0.05"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:background="@color/leetcode_card"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="4dp" />
+
+                    <TextView
+                        android:id="@+id/noteDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <!-- Structured note sections (collapsible cards) -->
                 <LinearLayout
                     android:id="@+id/noteSectionsContainer"
                     android:layout_width="match_parent"
@@ -48,6 +82,7 @@
                     android:orientation="vertical"
                     android:visibility="gone" />
 
+                <!-- Fallback plain text content -->
                 <TextView
                     android:id="@+id/noteContent"
                     android:layout_width="match_parent"
@@ -55,128 +90,180 @@
                     android:textSize="14sp"
                     android:lineSpacingMultiplier="1.3" />
 
-                <TextView
+            </LinearLayout>
+        </FrameLayout>
+    </ScrollView>
+
+    <!-- FAB to open Q&A bottom sheet -->
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fabAskAI"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:text="Ask AI"
+        app:icon="@android:drawable/ic_menu_help"
+        app:iconGravity="start" />
+
+    <!-- Q&A Bottom Sheet -->
+    <FrameLayout
+        android:id="@+id/bottomSheetContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/leetcode_bg"
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+        app:behavior_hideable="true"
+        app:behavior_peekHeight="0dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Drag handle -->
+            <View
+                android:layout_width="40dp"
+                android:layout_height="4dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="12dp"
+                android:background="@color/leetcode_border" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ask AI about this note"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
+
+            <!-- Quick question chips -->
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/quickQuestionChips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:singleLine="true">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipExplain"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:text="Quick questions"
-                    android:textSize="14sp" />
+                    android:text="Explain key concept" />
 
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/quickQuestionChips"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp">
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipExplain"
-                        style="@style/Widget.MaterialComponents.Chip.Action"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Explain key concept" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipQuiz"
-                        style="@style/Widget.MaterialComponents.Chip.Action"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Quiz me" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipPitfalls"
-                        style="@style/Widget.MaterialComponents.Chip.Action"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Common pitfalls" />
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipFlashcards"
-                        style="@style/Widget.MaterialComponents.Chip.Action"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Generate flashcards" />
-                </com.google.android.material.chip.ChipGroup>
-
-                <TextView
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipQuiz"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="Or ask your own"
-                    android:textSize="14sp" />
+                    android:text="Quiz me" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipPitfalls"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Common pitfalls" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipFlashcards"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Generate flashcards" />
+            </com.google.android.material.chip.ChipGroup>
+
+            <!-- Custom question input -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="e.g. Explain dynamic programming">
+                    android:layout_weight="1"
+                    android:hint="Ask a custom question…">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/questionInput"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="text" />
+                        android:inputType="text"
+                        android:imeOptions="actionSend" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnAsk"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Ask" />
+                    style="@style/Widget.MaterialComponents.Button.Icon"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    app:icon="@android:drawable/ic_menu_send"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    android:contentDescription="Send" />
+            </LinearLayout>
 
-                <FrameLayout
-                    android:id="@+id/answerArea"
+            <!-- Answer area -->
+            <FrameLayout
+                android:id="@+id/answerArea"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone"
+                android:minHeight="80dp">
+
+                <LinearLayout
+                    android:id="@+id/answerLoading"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:visibility="gone"
-                    android:minHeight="80dp">
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="24dp">
+                    <ProgressBar
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:indeterminateTint="@color/leetcode_primary" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="AI is thinking…"
+                        android:textSize="14sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
 
+                <ScrollView
+                    android:id="@+id/answerScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:padding="0dp">
                     <LinearLayout
-                        android:id="@+id/answerLoading"
+                        android:id="@+id/cardsContainer"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:gravity="center"
-                        android:padding="24dp">
-                        <ProgressBar
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:indeterminateTint="@color/leetcode_primary" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="AI is thinking…"
-                            android:textSize="14sp"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
+                        android:padding="0dp" />
+                </ScrollView>
 
-                    <ScrollView
-                        android:id="@+id/answerScroll"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:visibility="gone"
-                        android:padding="0dp">
-                        <LinearLayout
-                            android:id="@+id/cardsContainer"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:padding="0dp" />
-                    </ScrollView>
-
-                    <TextView
-                        android:id="@+id/answerText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:padding="16dp"
-                        android:background="@color/leetcode_card"
-                        android:textSize="15sp"
-                        android:lineSpacingMultiplier="1.35"
-                        android:letterSpacing="0.01"
-                        android:visibility="gone" />
-                </FrameLayout>
-            </LinearLayout>
-        </FrameLayout>
-    </ScrollView>
+                <TextView
+                    android:id="@+id/answerText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:background="@color/leetcode_card"
+                    android:textSize="15sp"
+                    android:lineSpacingMultiplier="1.35"
+                    android:letterSpacing="0.01"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
