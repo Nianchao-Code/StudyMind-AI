@@ -205,6 +205,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadRecentNotes() {
         repository.getAll(notes -> runOnUiThread(() -> {
+            if (isDestroyed() || isFinishing()) return;
             recentNotesContainer.removeAllViews();
             if (notes == null || notes.isEmpty()) {
                 recentNotesEmpty.setVisibility(View.VISIBLE);
