@@ -31,8 +31,8 @@ public class WhisperApiClientTest {
     }
 
     @After
-    public void tearDown() throws IOException {
-        server.shutdown();
+    public void tearDown() {
+        try { server.shutdown(); } catch (Exception ignored) {}
     }
 
     @Test
