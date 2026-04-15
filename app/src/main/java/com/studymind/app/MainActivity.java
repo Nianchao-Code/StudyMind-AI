@@ -42,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView notesResult;
     private View btnSaveNote;
 
+    private LinearLayout recentNotesContainer;
+    private TextView recentNotesEmpty;
+
     private StructuredNotes lastNotes;
     private ContentAnalysisResult lastAnalysis;
     private NoteRepository repository;
@@ -89,6 +92,8 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
         repository = new NoteRepository(this);
+        recentNotesContainer = findViewById(R.id.recentNotesContainer);
+        recentNotesEmpty = findViewById(R.id.recentNotesEmpty);
 
         progressBar = findViewById(R.id.progressBar);
         progressText = findViewById(R.id.progressText);
@@ -98,15 +103,31 @@ public class MainActivity extends AppCompatActivity {
         TextInputEditText youtubeUrlInput = findViewById(R.id.youtubeUrlInput);
         TextInputEditText pasteInput = findViewById(R.id.pasteInput);
 
-        View btnImportPdf = findViewById(R.id.btnImportPdf);
         View btnAnalyzeYouTube = findViewById(R.id.btnAnalyzeYouTube);
         View btnAnalyzePasted = findViewById(R.id.btnAnalyzePasted);
 
-        btnImportPdf.setOnClickListener(v -> pdfPicker.launch(new String[]{"application/pdf"}));
-        findViewById(R.id.btnRecordVoice).setOnClickListener(v -> startVoiceRecording());
-        findViewById(R.id.btnImportAudio).setOnClickListener(v -> audioPicker.launch(new String[]{
+        // Card-based input grid: each card triggers its action or reveals a panel
+        findViewById(R.id.cardImportPdf).setOnClickListener(v -> pdfPicker.launch(new String[]{"application/pdf"}));
+        findViewById(R.id.cardRecordVoice).setOnClickListener(v -> startVoiceRecording());
+        findViewById(R.id.cardImportAudio).setOnClickListener(v -> audioPicker.launch(new String[]{
                 "audio/*", "video/*"
         }));
+        findViewById(R.id.cardYouTube).setOnClickListener(v -> {
+            View panel = findViewById(R.id.youtubeInputPanel);
+            View pastePanel = findViewById(R.id.pasteInputPanel);
+            pastePanel.setVisibility(View.GONE);
+            panel.setVisibility(panel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+        });
+        findViewById(R.id.cardPasteText).setOnClickListener(v -> {
+            View panel = findViewById(R.id.pasteInputPanel);
+            View ytPanel = findViewById(R.id.youtubeInputPanel);
+            ytPanel.setVisibility(View.GONE);
+            panel.setVisibility(panel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+        });
+
+        // Hidden buttons kept for compatibility with setButtonsEnabled()
+        findViewById(R.id.btnRecordVoice).setOnClickListener(v -> startVoiceRecording());
+
         btnAnalyzeYouTube.setOnClickListener(v -> runYouTubeAnalysis(youtubeUrlInput));
         btnAnalyzePasted.setOnClickListener(v -> runPastedAnalysis(pasteInput));
         findViewById(R.id.btnSaveNote).setOnClickListener(v -> saveNote());
@@ -171,9 +192,59 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        loadRecentNotes();
+    }
+
+    @Override
     protected void onDestroy() {
         if (recording) stopRecording();
         super.onDestroy();
+    }
+
+    private void loadRecentNotes() {
+        repository.getAll(notes -> runOnUiThread(() -> {
+            if (isDestroyed() || isFinishing()) return;
+            recentNotesContainer.removeAllViews();
+            if (notes == null || notes.isEmpty()) {
+                recentNotesEmpty.setVisibility(View.VISIBLE);
+                return;
+            }
+            recentNotesEmpty.setVisibility(View.GONE);
+            // Sort by createdAt descending, show up to 3
+            notes.sort((a, b) -> Long.compare(b.createdAt, a.createdAt));
+            int count = Math.min(3, notes.size());
+            LayoutInflater inflater = LayoutInflater.from(this);
+            for (int i = 0; i < count; i++) {
+                com.studymind.app.data.StudyNote note = notes.get(i);
+                View row = inflater.inflate(R.layout.item_note, recentNotesContainer, false);
+                TextView titleView = row.findViewById(R.id.title);
+                TextView subtitleView = row.findViewById(R.id.subtitle);
+                titleView.setText(note.title);
+                String ago = formatRelativeTime(note.createdAt);
+                String src = note.sourceType != null ? note.sourceType.toUpperCase() : "";
+                subtitleView.setText(src + " · " + ago);
+                row.setOnClickListener(v -> {
+                    Intent intent = new Intent(this, NoteDetailActivity.class);
+                    intent.putExtra("id", note.id);
+                    startActivity(intent);
+                });
+                recentNotesContainer.addView(row);
+            }
+        }));
+    }
+
+    private String formatRelativeTime(long createdAt) {
+        long diff = System.currentTimeMillis() - createdAt;
+        long mins = diff / 60000;
+        if (mins < 1) return "Just now";
+        if (mins < 60) return mins + "m ago";
+        long hours = mins / 60;
+        if (hours < 24) return hours + "h ago";
+        long days = hours / 24;
+        if (days == 1) return "Yesterday";
+        return days + " days ago";
     }
 
     /** Used by both Import Audio/Video and Record voice. Both use transcript mode (5 sections, same as PDF). */
@@ -683,6 +754,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setButtonsEnabled(boolean enabled) {
+        // Card-based input grid
+        findViewById(R.id.cardImportPdf).setEnabled(enabled);
+        findViewById(R.id.cardImportPdf).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardRecordVoice).setEnabled(enabled);
+        findViewById(R.id.cardRecordVoice).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardImportAudio).setEnabled(enabled);
+        findViewById(R.id.cardImportAudio).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardYouTube).setEnabled(enabled);
+        findViewById(R.id.cardYouTube).setAlpha(enabled ? 1f : 0.5f);
+        findViewById(R.id.cardPasteText).setEnabled(enabled);
+        findViewById(R.id.cardPasteText).setAlpha(enabled ? 1f : 0.5f);
+        // Hidden legacy buttons + input panel buttons
         findViewById(R.id.btnImportPdf).setEnabled(enabled);
         findViewById(R.id.btnImportAudio).setEnabled(enabled);
         findViewById(R.id.btnRecordVoice).setEnabled(enabled);
