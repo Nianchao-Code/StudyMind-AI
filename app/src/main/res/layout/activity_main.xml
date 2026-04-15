@@ -13,11 +13,11 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="StudyMind AI"
+            app:title="StudyMind"
             app:menu="@menu/menu_main" />
     </com.google.android.material.appbar.AppBarLayout>
 
-        <ScrollView
+    <ScrollView
         android:id="@+id/mainScroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -30,91 +30,367 @@
             android:orientation="vertical"
             android:padding="16dp">
 
+            <!-- Section: New Note — Choose Input -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NEW NOTE — CHOOSE INPUT"
+                android:textSize="12sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.08"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
+            <!-- Card-based input grid: 2 columns -->
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:columnCount="2"
+                android:rowCount="3"
+                android:useDefaultMargins="true"
+                android:alignmentMode="alignBounds">
+
+                <!-- Import PDF -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardImportPdf"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/leetcode_card"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/leetcode_border">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:gravity="center">
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_menu_gallery"
+                            android:contentDescription="Import PDF" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Import PDF"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorOnSurface" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Upload slides or documents"
+                            android:textSize="11sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:gravity="center" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Record Voice -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardRecordVoice"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/leetcode_card"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/leetcode_border">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:gravity="center">
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_btn_speak_now"
+                            android:contentDescription="Record Voice" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Record Voice"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorOnSurface" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Speak or record lectures"
+                            android:textSize="11sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:gravity="center" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Audio / Video -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardImportAudio"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/leetcode_card"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/leetcode_border">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:gravity="center">
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_media_play"
+                            android:contentDescription="Audio/Video" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Audio / Video"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorOnSurface" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Import media files"
+                            android:textSize="11sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:gravity="center" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- YouTube Link -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardYouTube"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnWeight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/leetcode_card"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/leetcode_border">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp"
+                        android:gravity="center">
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_media_play"
+                            android:contentDescription="YouTube" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="YouTube Link"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorOnSurface" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Paste a video URL"
+                            android:textSize="11sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:gravity="center" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Paste Text (full width) -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardPasteText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_columnSpan="2"
+                    android:layout_columnWeight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/leetcode_card"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="@color/leetcode_border">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="16dp"
+                        android:gravity="center_vertical">
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/ic_menu_edit"
+                            android:contentDescription="Paste Text" />
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:layout_marginStart="12dp">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Paste Text"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:textColor="?attr/colorOnSurface" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Type or paste study material directly"
+                                android:textSize="11sp"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </GridLayout>
+
+            <!-- Hidden input panels (shown when a card is tapped) -->
+
+            <!-- YouTube URL input panel -->
+            <LinearLayout
+                android:id="@+id/youtubeInputPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp"
+                android:visibility="gone">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/youtubeUrlLayout"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="YouTube URL">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/youtubeUrlInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textUri" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAnalyzeYouTube"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Analyze Video" />
+            </LinearLayout>
+
+            <!-- Paste text input panel -->
+            <LinearLayout
+                android:id="@+id/pasteInputPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp"
+                android:visibility="gone">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Paste content">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/pasteInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textMultiLine"
+                        android:minLines="3" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAnalyzePasted"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Generate Notes" />
+            </LinearLayout>
+
+            <!-- Hidden old buttons (kept for compatibility, hidden) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnImportPdf"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Import PDF"
-                android:drawableStart="@android:drawable/ic_menu_gallery" />
-
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:text="Import PDF" />
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRecordVoice"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Record voice (Whisper)"
-                android:drawableStart="@android:drawable/ic_btn_speak_now" />
-
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:text="Record voice (Whisper)" />
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnImportAudio"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:text="Import Audio / Video (Whisper)" />
+
+            <!-- Recording indicator (shown while recording) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/recordingIndicator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Import Audio / Video (Whisper)"
-                android:drawableStart="@android:drawable/ic_btn_speak_now" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Or paste YouTube URL"
-                android:textSize="14sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/youtubeUrlLayout"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:hint="YouTube URL">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/youtubeUrlInput"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/leetcode_card"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/leetcode_border">
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textUri" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:padding="16dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/recordingStatus"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Recording…"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnSurface" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStopRecording"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Stop" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnAnalyzeYouTube"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Analyze Video" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Or paste transcript / text"
-                android:textSize="14sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:hint="Paste content">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/pasteInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textMultiLine"
-                    android:minLines="3" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnAnalyzePasted"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Generate Notes" />
-
+            <!-- Progress -->
             <LinearLayout
                 android:id="@+id/progressContainer"
                 android:layout_width="match_parent"
@@ -140,6 +416,7 @@
                     android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
 
+            <!-- Generated notes sections -->
             <LinearLayout
                 android:id="@+id/notesSectionsContainer"
                 android:layout_width="match_parent"
@@ -159,6 +436,7 @@
                 android:textSize="14sp"
                 android:visibility="gone" />
 
+            <!-- Save / Discard -->
             <LinearLayout
                 android:id="@+id/saveButtonsContainer"
                 android:layout_width="match_parent"
@@ -173,7 +451,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"
-                    android:text="Save to History" />
+                    android:text="Save Note" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnDiscardNote"
@@ -184,13 +462,52 @@
                     android:text="Discard" />
             </LinearLayout>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnHistory"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            <!-- Recent Notes section -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="View History" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/recentNotesHeader"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="RECENT NOTES"
+                    android:textSize="12sp"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.08"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnHistory"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="See All →"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/recentNotesContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                android:id="@+id/recentNotesEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="No notes yet. Import a file or record a lecture to get started."
+                android:textSize="13sp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:visibility="gone" />
+
         </LinearLayout>
     </ScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
