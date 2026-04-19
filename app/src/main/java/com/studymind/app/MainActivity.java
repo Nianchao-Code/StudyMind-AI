@@ -8,6 +8,9 @@ import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -198,8 +201,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+        if (recording) {
+            // Lifecycle interruption (incoming call, Home press, etc.) — stop gracefully
+            stopRecordingForInterruption();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         if (recording) stopRecording();
+        stopRecordingTimer();
         super.onDestroy();
     }
 
@@ -282,8 +295,16 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onError(Throwable t) {
                 runOnUiThread(() -> {
-                    setLoading(false, null);
-                    Toast.makeText(MainActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                    setLoading(false, null);  // TC4: resets to IDLE — re-enables all buttons via setButtonsEnabled(true)
+                    String message = t.getMessage() != null ? t.getMessage() : "Unknown error";
+                    boolean isNetworkError = t instanceof java.io.IOException;
+                    new MaterialAlertDialogBuilder(MainActivity.this)
+                            .setTitle("Transcription Failed")
+                            .setMessage(isNetworkError
+                                    ? "Could not reach the transcription service. Please check your internet connection and try again.\n\nDetails: " + message
+                                    : "An error occurred during transcription.\n\nDetails: " + message)
+                            .setPositiveButton("OK", null)
+                            .show();
                 });
             }
         });
@@ -775,7 +796,17 @@ public class MainActivity extends AppCompatActivity {
 
     private void startVoiceRecording() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+            // TC3: Show rationale before requesting if previously denied
+            if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle("Microphone Permission Needed")
+                        .setMessage("StudyMind AI needs microphone access to record your voice and transcribe it into study notes using Whisper AI.")
+                        .setPositiveButton("Grant", (d, w) -> requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO))
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            } else {
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+            }
             return;
         }
         if (recording) {
@@ -795,10 +826,13 @@ public class MainActivity extends AppCompatActivity {
             recorder.start();
             mediaRecorder = recorder;
             recording = true;
+            recordingStartTime = System.currentTimeMillis();
+            // TC1: Update button and start elapsed time display
             View btn = findViewById(R.id.btnRecordVoice);
             if (btn instanceof com.google.android.material.button.MaterialButton) {
-                ((com.google.android.material.button.MaterialButton) btn).setText("Stop recording");
+                ((com.google.android.material.button.MaterialButton) btn).setText("Stop recording (0:00)");
             }
+            startRecordingTimer();
             Toast.makeText(this, "Recording... Tap again to stop", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Toast.makeText(this, "Recording failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -806,6 +840,32 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopRecording() {
+        stopRecordingTimer();
+        releaseMediaRecorder();
+        recording = false;
+        resetRecordButton();
+        if (recordFile != null && recordFile.exists()) {
+            processAudio(Uri.fromFile(recordFile), "Voice recording");
+        }
+        recordFile = null;
+    }
+
+    /** TC2: Called when activity is stopped (incoming call, Home press). Stops recording gracefully
+     *  and processes what was captured so far, without crashing or leaving the recorder dangling. */
+    private void stopRecordingForInterruption() {
+        stopRecordingTimer();
+        releaseMediaRecorder();
+        recording = false;
+        resetRecordButton();
+        if (recordFile != null && recordFile.exists() && recordFile.length() > 0) {
+            // Process the partial recording that was captured before interruption
+            Toast.makeText(this, "Recording stopped (app interrupted). Processing captured audio…", Toast.LENGTH_LONG).show();
+            processAudio(Uri.fromFile(recordFile), "Voice recording");
+        }
+        recordFile = null;
+    }
+
+    private void releaseMediaRecorder() {
         if (mediaRecorder != null) {
             try {
                 mediaRecorder.stop();
@@ -813,15 +873,44 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
             mediaRecorder = null;
         }
-        recording = false;
+    }
+
+    private void resetRecordButton() {
         View btn = findViewById(R.id.btnRecordVoice);
         if (btn instanceof com.google.android.material.button.MaterialButton) {
             ((com.google.android.material.button.MaterialButton) btn).setText("Record voice (Whisper)");
         }
-        if (recordFile != null && recordFile.exists()) {
-            processAudio(Uri.fromFile(recordFile), "Voice recording");  // same pipeline as Import Audio/Video → transcript mode
+    }
+
+    // TC1: Recording timer — shows elapsed time on the button
+    private final Handler timerHandler = new Handler(Looper.getMainLooper());
+    private Runnable timerRunnable;
+    private long recordingStartTime;
+
+    private void startRecordingTimer() {
+        timerRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!recording) return;
+                long elapsed = (System.currentTimeMillis() - recordingStartTime) / 1000;
+                long mins = elapsed / 60;
+                long secs = elapsed % 60;
+                View btn = findViewById(R.id.btnRecordVoice);
+                if (btn instanceof com.google.android.material.button.MaterialButton) {
+                    ((com.google.android.material.button.MaterialButton) btn)
+                            .setText(String.format("Stop recording (%d:%02d)", mins, secs));
+                }
+                timerHandler.postDelayed(this, 1000);
+            }
+        };
+        timerHandler.postDelayed(timerRunnable, 1000);
+    }
+
+    private void stopRecordingTimer() {
+        if (timerRunnable != null) {
+            timerHandler.removeCallbacks(timerRunnable);
+            timerRunnable = null;
         }
-        recordFile = null;
     }
 
     private MediaRecorder mediaRecorder;
@@ -831,8 +920,29 @@ public class MainActivity extends AppCompatActivity {
     private final ActivityResultLauncher<String> requestPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(),
             granted -> {
-                if (granted) startVoiceRecording();
-                else Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show();
+                if (granted) {
+                    startVoiceRecording();
+                } else {
+                    // TC3: If permanently denied, guide user to app settings
+                    if (!shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+                        new MaterialAlertDialogBuilder(this)
+                                .setTitle("Permission Required")
+                                .setMessage("Microphone permission was permanently denied. Please enable it in Settings to use voice recording.")
+                                .setPositiveButton("Open Settings", (d, w) -> {
+                                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                    intent.setData(Uri.parse("package:" + getPackageName()));
+                                    startActivity(intent);
+                                })
+                                .setNegativeButton("Cancel", null)
+                                .show();
+                    } else {
+                        new MaterialAlertDialogBuilder(this)
+                                .setTitle("Permission Required")
+                                .setMessage("Microphone permission is needed to record voice and generate study notes.")
+                                .setPositiveButton("OK", null)
+                                .show();
+                    }
+                }
             }
     );
 }
