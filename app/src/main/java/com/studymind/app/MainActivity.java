@@ -33,6 +33,7 @@ import com.studymind.app.agent.ChunkSummarizationPipeline;
 import com.studymind.app.agent.ContentAnalysisResult;
 import com.studymind.app.agent.StructuredNotes;
 import com.studymind.app.agent.TagSuggestionAgent;
+import com.studymind.app.agent.TitleSuggestionAgent;
 import com.studymind.app.data.NoteRepository;
 import com.studymind.app.data.StudyNote;
 import com.studymind.app.pdf.PdfTextExtractor;
@@ -819,20 +820,50 @@ public class MainActivity extends AppCompatActivity {
 
     private void saveNote() {
         if (lastNotes == null || lastAnalysis == null) return;
+        final String originalFallback = lastTitle != null ? lastTitle : "";
         TextInputEditText titleInput = new TextInputEditText(this);
         titleInput.setPadding(48, 32, 48, 32);
-        titleInput.setText(lastTitle);
+        titleInput.setText(originalFallback);
         titleInput.setHint("Note title");
-        new MaterialAlertDialogBuilder(this)
+
+        androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(this)
                 .setTitle("Save to History")
+                .setMessage("AI is suggesting a title…")
                 .setView(titleInput)
                 .setPositiveButton("Save", (d, w) -> {
                     String title = titleInput.getText() != null ? titleInput.getText().toString().trim() : "";
-                    if (title.isEmpty()) title = lastTitle;
+                    if (title.isEmpty()) title = originalFallback;
                     saveWithSuggestedTags(title);
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+
+        // Fire title suggestion in the background; if user hasn't edited the fallback, replace it.
+        TitleSuggestionAgent titleAgent = new TitleSuggestionAgent(StudyMindApp.getAIApiClient());
+        String body = lastNotes.toDisplayText();
+        final boolean[] resolved = {false};
+        Handler handler = new Handler(Looper.getMainLooper());
+        Runnable timeout = () -> {
+            if (resolved[0]) return;
+            resolved[0] = true;
+            if (dialog.isShowing()) dialog.setMessage(null);
+        };
+        handler.postDelayed(timeout, 6000);
+
+        titleAgent.suggest(body, suggested -> runOnUiThread(() -> {
+            if (resolved[0]) return;
+            resolved[0] = true;
+            handler.removeCallbacks(timeout);
+            if (!dialog.isShowing()) return;
+            dialog.setMessage(null);
+            if (suggested == null || suggested.isEmpty()) return;
+            String current = titleInput.getText() != null ? titleInput.getText().toString() : "";
+            // Only replace if user hasn't started editing (still matches the fallback).
+            if (current.equals(originalFallback)) {
+                titleInput.setText(suggested);
+                titleInput.setSelection(suggested.length());
+            }
+        }));
     }
 
     /** Generates tags via AI (with a short timeout) then persists the note. */
