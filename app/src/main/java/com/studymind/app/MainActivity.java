@@ -32,6 +32,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.studymind.app.agent.ChunkSummarizationPipeline;
 import com.studymind.app.agent.ContentAnalysisResult;
 import com.studymind.app.agent.StructuredNotes;
+import com.studymind.app.agent.TagSuggestionAgent;
 import com.studymind.app.data.NoteRepository;
 import com.studymind.app.data.StudyNote;
 import com.studymind.app.pdf.PdfTextExtractor;
@@ -828,15 +829,49 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Save", (d, w) -> {
                     String title = titleInput.getText() != null ? titleInput.getText().toString().trim() : "";
                     if (title.isEmpty()) title = lastTitle;
-                    StudyNote note = new StudyNote(title, lastSourceType, lastSourceRef,
-                            lastAnalysis.getSubject(), lastAnalysis.getStrategy().name(), lastNotes.toJson());
-                    repository.insert(note, id -> runOnUiThread(() -> {
-                        Toast.makeText(this, "Saved to history", Toast.LENGTH_SHORT).show();
-                        discardNote();
-                    }));
+                    saveWithSuggestedTags(title);
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /** Generates tags via AI (with a short timeout) then persists the note. */
+    private void saveWithSuggestedTags(String title) {
+        final String finalTitle = title;
+        final String body = lastNotes.toDisplayText();
+        Toast.makeText(this, "Tagging with AI…", Toast.LENGTH_SHORT).show();
+
+        final boolean[] saved = {false};
+        TagSuggestionAgent agent = new TagSuggestionAgent(StudyMindApp.getAIApiClient());
+        // Hard stop after 6s: save without tags if AI is slow.
+        Handler handler = new Handler(Looper.getMainLooper());
+        Runnable fallback = () -> {
+            if (saved[0]) return;
+            saved[0] = true;
+            persistNote(finalTitle, "");
+        };
+        handler.postDelayed(fallback, 6000);
+
+        agent.suggest(finalTitle, body, tags -> runOnUiThread(() -> {
+            if (saved[0]) return;
+            saved[0] = true;
+            handler.removeCallbacks(fallback);
+            persistNote(finalTitle, tags != null ? tags : "");
+        }));
+    }
+
+    private void persistNote(String title, String tags) {
+        StudyNote note = new StudyNote(title, lastSourceType, lastSourceRef,
+                lastAnalysis.getSubject(), lastAnalysis.getStrategy().name(), lastNotes.toJson());
+        if (tags != null && !tags.isEmpty()) note.tags = tags;
+        repository.insert(note, id -> runOnUiThread(() -> {
+            if (tags != null && !tags.isEmpty()) {
+                Toast.makeText(this, "Saved · tags: " + tags, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Saved to history", Toast.LENGTH_SHORT).show();
+            }
+            discardNote();
+        }));
     }
 
     private void setLoading(boolean loading, String message) {
