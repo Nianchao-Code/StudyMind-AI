@@ -159,6 +159,37 @@ def summarize_post(req: SummarizeRequest):
         raise HTTPException(500, str(e))
 
 
+# ----- /embed -----
+class EmbedRequest(BaseModel):
+    texts: list[str]
+
+
+@app.post("/embed")
+def embed_post(req: EmbedRequest):
+    """Proxy to OpenAI embeddings. Returns one vector per input text.
+    Used by the Android client for on-device cross-note RAG search."""
+    key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(500, "OPENAI_API_KEY not configured")
+    if not req.texts:
+        return {"embeddings": []}
+
+    import requests
+
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/embeddings",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"model": "text-embedding-3-small", "input": req.texts},
+            timeout=60,
+        )
+        r.raise_for_status()
+        data = r.json()
+        return {"embeddings": [d["embedding"] for d in data.get("data", [])]}
+    except requests.RequestException as e:
+        raise HTTPException(500, str(e))
+
+
 # ----- /whisper -----
 class WhisperRequest(BaseModel):
     audio: str

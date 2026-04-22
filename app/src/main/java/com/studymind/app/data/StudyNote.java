@@ -21,6 +21,7 @@ public class StudyNote {
     public long createdAt;
     public boolean isPinned;
     public String tags;            // Comma-separated tags
+    public byte[] embedding;       // Vector embedding for RAG search (float[] serialized LE)
 
     public StudyNote() {}
 

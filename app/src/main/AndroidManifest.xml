@@ -39,6 +39,10 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:parentActivityName=".HistoryActivity" />
+        <activity
+            android:name=".AskAllActivity"
+            android:exported="false"
+            android:parentActivityName=".HistoryActivity" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

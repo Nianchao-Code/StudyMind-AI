@@ -42,6 +42,9 @@ public class HistoryActivity extends AppCompatActivity {
         }
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
+        findViewById(R.id.btnAskAll).setOnClickListener(v ->
+                startActivity(new Intent(this, AskAllActivity.class)));
+
         TextInputEditText searchInput = findViewById(R.id.searchInput);
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override
