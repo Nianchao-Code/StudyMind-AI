@@ -65,6 +65,11 @@ public class NoteDetailActivity extends AppCompatActivity {
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private boolean isGeneratingDeck = false;
 
+    private android.speech.tts.TextToSpeech tts;
+    private boolean ttsReady = false;
+    private boolean ttsSpeaking = false;
+    private MenuItem ttsMenuItem;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -153,6 +158,7 @@ public class NoteDetailActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_note_detail, menu);
+        ttsMenuItem = menu.findItem(R.id.action_read_aloud);
         return true;
     }
 
@@ -168,6 +174,10 @@ public class NoteDetailActivity extends AppCompatActivity {
         }
         if (item.getItemId() == R.id.action_edit_content) {
             editContent();
+            return true;
+        }
+        if (item.getItemId() == R.id.action_read_aloud) {
+            toggleReadAloud();
             return true;
         }
         if (item.getItemId() == R.id.action_tags) {
@@ -420,6 +430,136 @@ public class NoteDetailActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         flashcardIo.shutdown();
+        if (tts != null) {
+            try { tts.stop(); tts.shutdown(); } catch (Exception ignored) {}
+            tts = null;
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopReadAloud();
+    }
+
+    private void toggleReadAloud() {
+        if (note == null) return;
+        if (ttsSpeaking) {
+            stopReadAloud();
+            return;
+        }
+        if (tts == null) {
+            tts = new android.speech.tts.TextToSpeech(getApplicationContext(), status -> {
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    ttsReady = true;
+                    try { tts.setLanguage(java.util.Locale.US); } catch (Exception ignored) {}
+                    tts.setOnUtteranceProgressListener(new android.speech.tts.UtteranceProgressListener() {
+                        @Override public void onStart(String utteranceId) {}
+                        @Override public void onDone(String utteranceId) {
+                            if ("tts_last".equals(utteranceId)) {
+                                runOnUiThread(() -> {
+                                    ttsSpeaking = false;
+                                    updateTtsMenuTitle();
+                                });
+                            }
+                        }
+                        @Override public void onError(String utteranceId) {
+                            runOnUiThread(() -> {
+                                ttsSpeaking = false;
+                                updateTtsMenuTitle();
+                            });
+                        }
+                    });
+                    runOnUiThread(this::startReadAloud);
+                } else {
+                    Toast.makeText(this, "Text-to-speech not available on this device",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+            return;
+        }
+        if (ttsReady) startReadAloud();
+    }
+
+    private void startReadAloud() {
+        if (tts == null || !ttsReady || note == null) return;
+        java.util.List<String> chunks = buildSpeakableChunks();
+        if (chunks.isEmpty()) {
+            Toast.makeText(this, "Nothing to read yet", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        tts.stop();
+        for (int i = 0; i < chunks.size(); i++) {
+            String id = (i == chunks.size() - 1) ? "tts_last" : "tts_" + i;
+            tts.speak(chunks.get(i), android.speech.tts.TextToSpeech.QUEUE_ADD, null, id);
+        }
+        ttsSpeaking = true;
+        updateTtsMenuTitle();
+        Toast.makeText(this, "Reading note…", Toast.LENGTH_SHORT).show();
+    }
+
+    private void stopReadAloud() {
+        if (tts != null) {
+            try { tts.stop(); } catch (Exception ignored) {}
+        }
+        ttsSpeaking = false;
+        updateTtsMenuTitle();
+    }
+
+    private void updateTtsMenuTitle() {
+        if (ttsMenuItem != null) {
+            ttsMenuItem.setTitle(ttsSpeaking ? "Stop reading" : "Read aloud");
+        }
+    }
+
+    /** Breaks the note into short speakable chunks so long notes stay within TTS limits. */
+    private java.util.List<String> buildSpeakableChunks() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (note == null) return out;
+        String title = note.title != null ? note.title.trim() : "";
+        if (!title.isEmpty()) out.add(title + ".");
+
+        String content = note.content != null ? note.content : "";
+        StructuredNotes sn = StructuredNotes.fromJson(content);
+        if (sn != null && hasAnyContent(sn)) {
+            addSpeakable(out, "Key definitions.", sn.keyDefinitions);
+            addSpeakable(out, "Core concepts.", sn.coreConcepts);
+            addSpeakable(out, "Formulas and steps.", sn.importantFormulas);
+            addSpeakable(out, "Common pitfalls.", sn.commonPitfalls);
+            addSpeakable(out, "Quick review.", sn.quickReview);
+        } else {
+            splitAndAdd(out, content);
+        }
+        return out;
+    }
+
+    private void addSpeakable(java.util.List<String> out, String heading, String section) {
+        String body = cleanSectionContent(section);
+        if (body.isEmpty()) return;
+        out.add(heading);
+        splitAndAdd(out, body);
+    }
+
+    /** Splits a text block into <= ~400 char chunks on sentence / newline boundaries. */
+    private void splitAndAdd(java.util.List<String> out, String body) {
+        if (body == null) return;
+        String cleaned = body
+                .replaceAll("[•\\-]+", "")
+                .replaceAll("\\*+", "")
+                .replaceAll("#+", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (cleaned.isEmpty()) return;
+        final int LIMIT = 400;
+        StringBuilder buf = new StringBuilder();
+        for (String sentence : cleaned.split("(?<=[.!?])\\s+")) {
+            if (buf.length() + sentence.length() + 1 > LIMIT && buf.length() > 0) {
+                out.add(buf.toString().trim());
+                buf.setLength(0);
+            }
+            buf.append(sentence).append(' ');
+        }
+        if (buf.length() > 0) out.add(buf.toString().trim());
     }
 
     /** Updates the study entry card label based on the current deck size + mastered count. */

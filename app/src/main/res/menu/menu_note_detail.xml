@@ -11,6 +11,11 @@
         android:icon="@android:drawable/ic_menu_edit"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/action_read_aloud"
+        android:title="Read aloud"
+        android:icon="@android:drawable/ic_lock_silent_mode_off"
+        app:showAsAction="ifRoom" />
+    <item
         android:id="@+id/action_tags"
         android:title="Edit tags"
         app:showAsAction="never" />
