@@ -35,6 +35,9 @@ import androidx.core.content.ContextCompat;
 import com.studymind.app.agent.FlashcardQuizParser;
 import com.studymind.app.agent.NoteQAAgent;
 import com.studymind.app.agent.StructuredNotes;
+import com.studymind.app.data.AppDatabase;
+import com.studymind.app.data.Flashcard;
+import com.studymind.app.data.FlashcardDao;
 import com.studymind.app.data.NoteRepository;
 import com.studymind.app.data.StudyNote;
 
@@ -51,6 +54,16 @@ public class NoteDetailActivity extends AppCompatActivity {
     private View answerScroll;
     private LinearLayout cardsContainer;
     private BottomSheetBehavior<View> bottomSheetBehavior;
+
+    private View studyEntryCard;
+    private TextView studyEntryTitle;
+    private TextView studyEntrySubtitle;
+    private View studyEntryProgress;
+    private View studyEntryChevron;
+    private FlashcardDao flashcardDao;
+    private final java.util.concurrent.ExecutorService flashcardIo =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+    private boolean isGeneratingDeck = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +84,15 @@ public class NoteDetailActivity extends AppCompatActivity {
         answerLoading = findViewById(R.id.answerLoading);
         answerScroll = findViewById(R.id.answerScroll);
         cardsContainer = findViewById(R.id.cardsContainer);
+        studyEntryCard = findViewById(R.id.cardStudyEntry);
+        studyEntryTitle = findViewById(R.id.studyEntryTitle);
+        studyEntrySubtitle = findViewById(R.id.studyEntrySubtitle);
+        studyEntryProgress = findViewById(R.id.studyEntryProgress);
+        studyEntryChevron = findViewById(R.id.studyEntryChevron);
+        flashcardDao = AppDatabase.getInstance(getApplicationContext()).flashcardDao();
+        if (studyEntryCard != null) {
+            studyEntryCard.setOnClickListener(v -> onStudyEntryClicked());
+        }
         View loadingNote = findViewById(R.id.loadingNote);
         View contentContainer = findViewById(R.id.noteContentContainer);
 
@@ -118,7 +140,10 @@ public class NoteDetailActivity extends AppCompatActivity {
         findViewById(R.id.chipExplain).setOnClickListener(v -> askQuestion("Explain the key concepts in simple terms."));
         findViewById(R.id.chipQuiz).setOnClickListener(v -> askQuestion("Give me 3 practice questions. For each use: Question 1: [question] Answer: [answer]. Then Question 2: ... etc."));
         findViewById(R.id.chipPitfalls).setOnClickListener(v -> askQuestion("What are the most common exam pitfalls for this material?"));
-        findViewById(R.id.chipFlashcards).setOnClickListener(v -> askQuestion("Generate 5 flashcards. For each card, use exactly this format on a new line: *Front:* [question] *Back:* [answer]. No other formatting."));
+        findViewById(R.id.chipFlashcards).setOnClickListener(v -> {
+            if (bottomSheetBehavior != null) bottomSheetBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
+            onStudyEntryClicked();
+        });
 
         loadingNote.setVisibility(View.VISIBLE);
         contentContainer.setVisibility(View.GONE);
@@ -381,7 +406,120 @@ public class NoteDetailActivity extends AppCompatActivity {
                     noteSectionsContainer.setVisibility(View.GONE);
                     noteContent.setVisibility(View.VISIBLE);
                 }
+                refreshStudyEntry();
             }));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshStudyEntry();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        flashcardIo.shutdown();
+    }
+
+    /** Updates the study entry card label based on the current deck size + mastered count. */
+    private void refreshStudyEntry() {
+        if (note == null || studyEntryCard == null) return;
+        final long nid = note.id;
+        flashcardIo.execute(() -> {
+            int total = flashcardDao.countByNoteId(nid);
+            int mastered = flashcardDao.countMasteredByNoteId(nid);
+            runOnUiThread(() -> {
+                if (total <= 0) {
+                    studyEntryTitle.setText("Study with flashcards");
+                    studyEntrySubtitle.setText("Tap to generate a deck from this note");
+                } else {
+                    studyEntryTitle.setText("🎯 Study (" + total + " cards)");
+                    studyEntrySubtitle.setText(mastered + " mastered · tap to continue");
+                }
+            });
+        });
+    }
+
+    private void onStudyEntryClicked() {
+        if (note == null || isGeneratingDeck) return;
+        flashcardIo.execute(() -> {
+            int total = flashcardDao.countByNoteId(note.id);
+            runOnUiThread(() -> {
+                if (total > 0) launchStudy();
+                else generateDeckThenLaunch();
+            });
+        });
+    }
+
+    private void launchStudy() {
+        if (note == null) return;
+        Intent intent = new Intent(this, FlashcardStudyActivity.class);
+        intent.putExtra(FlashcardStudyActivity.EXTRA_NOTE_ID, note.id);
+        intent.putExtra(FlashcardStudyActivity.EXTRA_NOTE_TITLE, note.title);
+        startActivity(intent);
+    }
+
+    private void generateDeckThenLaunch() {
+        if (note == null) return;
+        if (StudyMindApp.getAIApiClient() instanceof com.studymind.app.api.MockAIApiClient) {
+            Toast.makeText(this, "Configure TRANSCRIPT_BACKEND_URL or OPENAI_API_KEY.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        setStudyEntryLoading(true);
+        Toast.makeText(this, "Generating flashcards…", Toast.LENGTH_SHORT).show();
+
+        String content = note.content != null ? note.content : "";
+        StructuredNotes sn = StructuredNotes.fromJson(content);
+        String display = sn != null ? sn.toDisplayText() : content;
+
+        String prompt = "Create up to 10 flashcards covering the most important facts, definitions, "
+                + "and concepts from the study material below. Use ONLY what's actually in the notes. "
+                + "If the notes are short or narrow, generate fewer cards (as few as 3). "
+                + "DO NOT invent information that isn't in the notes. Each card on its own block, "
+                + "format each card EXACTLY as:\n*Front:* [question]\n*Back:* [answer]\n"
+                + "Keep each front under 25 words and each back under 40 words.";
+
+        NoteQAAgent qa = new NoteQAAgent(StudyMindApp.getAIApiClient());
+        qa.ask(display, prompt, answer -> runOnUiThread(() -> {
+            java.util.List<FlashcardQuizParser.Card> parsed =
+                    FlashcardQuizParser.parseFlashcards(answer);
+            if (parsed == null || parsed.isEmpty()) {
+                setStudyEntryLoading(false);
+                Toast.makeText(this,
+                        "Couldn't generate flashcards from this note. Try adding more content.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            int keep = Math.min(parsed.size(), 10);
+            java.util.List<Flashcard> toInsert = new java.util.ArrayList<>();
+            for (int i = 0; i < keep; i++) {
+                FlashcardQuizParser.Card c = parsed.get(i);
+                if (c.front == null || c.front.isEmpty() || c.back == null || c.back.isEmpty()) continue;
+                toInsert.add(new Flashcard(note.id, c.front, c.back));
+            }
+            if (toInsert.isEmpty()) {
+                setStudyEntryLoading(false);
+                Toast.makeText(this, "No valid flashcards produced.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            flashcardIo.execute(() -> {
+                flashcardDao.insertAll(toInsert);
+                runOnUiThread(() -> {
+                    setStudyEntryLoading(false);
+                    refreshStudyEntry();
+                    launchStudy();
+                });
+            });
+        }));
+    }
+
+    private void setStudyEntryLoading(boolean loading) {
+        isGeneratingDeck = loading;
+        if (studyEntryCard != null) studyEntryCard.setEnabled(!loading);
+        if (studyEntryProgress != null) studyEntryProgress.setVisibility(loading ? View.VISIBLE : View.GONE);
+        if (studyEntryChevron != null) studyEntryChevron.setVisibility(loading ? View.GONE : View.VISIBLE);
+        if (loading && studyEntrySubtitle != null) studyEntrySubtitle.setText("AI is building your deck…");
     }
 
     private void askQuestion() {
@@ -474,6 +612,7 @@ public class NoteDetailActivity extends AppCompatActivity {
     private void renderCards(java.util.List<FlashcardQuizParser.Card> cards) {
         cardsContainer.removeAllViews();
         LayoutInflater inflater = LayoutInflater.from(this);
+
         for (FlashcardQuizParser.Card card : cards) {
             View cardView = inflater.inflate(R.layout.item_flashcard, cardsContainer, false);
             TextView front = cardView.findViewById(R.id.cardFront);

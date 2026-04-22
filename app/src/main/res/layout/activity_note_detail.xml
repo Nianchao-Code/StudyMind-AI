@@ -74,6 +74,70 @@
                         android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- Persistent flashcard study entry point -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardStudyEntry"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/leetcode_primary"
+                    app:strokeWidth="0dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="14dp"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🎯"
+                            android:textSize="24sp" />
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="12dp">
+                            <TextView
+                                android:id="@+id/studyEntryTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Study with flashcards"
+                                android:textSize="15sp"
+                                android:textStyle="bold"
+                                android:textColor="#FFFFFF" />
+                            <TextView
+                                android:id="@+id/studyEntrySubtitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Generate a deck from this note"
+                                android:textSize="12sp"
+                                android:textColor="#E0FFFFFF" />
+                        </LinearLayout>
+                        <ProgressBar
+                            android:id="@+id/studyEntryProgress"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:indeterminateTint="#FFFFFF"
+                            android:visibility="gone" />
+                        <TextView
+                            android:id="@+id/studyEntryChevron"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="›"
+                            android:textSize="24sp"
+                            android:textColor="#FFFFFF"
+                            android:layout_marginStart="8dp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <!-- Structured note sections (collapsible cards) -->
                 <LinearLayout
                     android:id="@+id/noteSectionsContainer"
@@ -171,7 +235,7 @@
                     style="@style/Widget.MaterialComponents.Chip.Action"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Generate flashcards" />
+                    android:text="Study deck" />
             </com.google.android.material.chip.ChipGroup>
 
             <!-- Custom question input -->

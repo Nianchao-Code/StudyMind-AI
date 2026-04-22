@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="4dp"
+    app:cardBackgroundColor="@color/leetcode_card"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/leetcode_border">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:id="@+id/pageClickable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="360dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="28dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:id="@+id/pageIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="❓"
+                android:textSize="40sp"
+                android:alpha="0.9" />
+
+            <TextView
+                android:id="@+id/pageSideLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="QUESTION"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.2"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <TextView
+                android:id="@+id/pageFront"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:lineSpacingMultiplier="1.3"
+                android:gravity="center"
+                android:textColor="?attr/colorOnSurface" />
+
+            <View
+                android:id="@+id/pageDivider"
+                android:layout_width="56dp"
+                android:layout_height="2dp"
+                android:layout_marginTop="28dp"
+                android:visibility="gone"
+                android:background="@color/leetcode_primary" />
+
+            <TextView
+                android:id="@+id/pageBack"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:visibility="gone"
+                android:textSize="17sp"
+                android:lineSpacingMultiplier="1.4"
+                android:gravity="center"
+                android:textColor="@color/leetcode_primary" />
+
+            <TextView
+                android:id="@+id/pageHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:text="Tap card to reveal answer"
+                android:textSize="12sp"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</com.google.android.material.card.MaterialCardView>
