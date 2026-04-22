@@ -111,6 +111,10 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, SettingsActivity.class));
                 return true;
             }
+            if (item.getItemId() == R.id.action_stats) {
+                startActivity(new Intent(this, DashboardActivity.class));
+                return true;
+            }
             return false;
         });
         repository = new NoteRepository(this);

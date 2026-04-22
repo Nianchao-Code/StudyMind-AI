@@ -30,4 +30,7 @@ public interface FlashcardDao {
 
     @Query("DELETE FROM flashcards WHERE noteId = :noteId")
     void deleteByNoteId(long noteId);
+
+    @Query("SELECT * FROM flashcards")
+    List<Flashcard> getAll();
 }
