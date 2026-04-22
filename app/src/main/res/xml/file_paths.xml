@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <external-files-path name="documents" path="Documents/" />
+    <external-files-path name="images" path="Pictures/" />
+    <cache-path name="ocr_cache" path="ocr/" />
     <files-path name="files" path="." />
 </paths>

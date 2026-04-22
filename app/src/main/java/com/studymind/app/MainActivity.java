@@ -80,6 +80,25 @@ public class MainActivity extends AppCompatActivity {
             }
     );
 
+    private Uri pendingCameraUri;
+
+    private final ActivityResultLauncher<Uri> cameraLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success != null && success && pendingCameraUri != null) {
+                    processImageForOcr(pendingCameraUri);
+                }
+                pendingCameraUri = null;
+            }
+    );
+
+    private final ActivityResultLauncher<String> galleryLauncher = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) processImageForOcr(uri);
+            }
+    );
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -127,6 +146,7 @@ public class MainActivity extends AppCompatActivity {
             ytPanel.setVisibility(View.GONE);
             panel.setVisibility(panel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
         });
+        findViewById(R.id.cardPhotoOcr).setOnClickListener(v -> showPhotoOcrChooser());
 
         // Hidden buttons kept for compatibility with setButtonsEnabled()
         findViewById(R.id.btnRecordVoice).setOnClickListener(v -> startVoiceRecording());
@@ -327,6 +347,65 @@ public class MainActivity extends AppCompatActivity {
                 runPipeline(text, lastTitle, "pdf", uri.toString());
             });
         }).start();
+    }
+
+    /** Show a chooser: take photo vs pick from gallery. Both feed into the OCR pipeline. */
+    private void showPhotoOcrChooser() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Photo OCR")
+                .setMessage("Scan text from a photo. Works best with clear, well-lit pages.")
+                .setPositiveButton("Take Photo", (d, w) -> launchCameraForOcr())
+                .setNegativeButton("Choose from Gallery", (d, w) -> galleryLauncher.launch("image/*"))
+                .setNeutralButton("Cancel", null)
+                .show();
+    }
+
+    private void launchCameraForOcr() {
+        try {
+            java.io.File dir = new java.io.File(getCacheDir(), "ocr");
+            if (!dir.exists() && !dir.mkdirs()) {
+                Toast.makeText(this, "Could not create cache dir", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            java.io.File photoFile = new java.io.File(dir, "ocr_" + System.currentTimeMillis() + ".jpg");
+            pendingCameraUri = androidx.core.content.FileProvider.getUriForFile(
+                    this, getPackageName() + ".fileprovider", photoFile);
+            cameraLauncher.launch(pendingCameraUri);
+        } catch (Exception e) {
+            Toast.makeText(this, "Camera unavailable: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            pendingCameraUri = null;
+        }
+    }
+
+    private void processImageForOcr(Uri imageUri) {
+        discardNote();
+        setLoading(true, "Scanning text from image…");
+        com.studymind.app.ocr.OcrHelper.recognize(this, imageUri,
+                new com.studymind.app.ocr.OcrHelper.OcrCallback() {
+            @Override
+            public void onSuccess(String text) {
+                runOnUiThread(() -> {
+                    lastTitle = "Photo Notes " + new java.text.SimpleDateFormat(
+                            "MMM d HH:mm", java.util.Locale.getDefault())
+                            .format(new java.util.Date());
+                    setLoading(true, "Generating notes…");
+                    runPipeline(text, lastTitle, "ocr", imageUri.toString());
+                });
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                runOnUiThread(() -> {
+                    setLoading(false, null);
+                    String msg = t.getMessage() != null ? t.getMessage() : "OCR failed";
+                    new MaterialAlertDialogBuilder(MainActivity.this)
+                            .setTitle("OCR Failed")
+                            .setMessage(msg + "\n\nTry a clearer photo with good lighting.")
+                            .setPositiveButton("OK", null)
+                            .show();
+                });
+            }
+        });
     }
 
     private static final String PREF_YOUTUBE_REMEMBER_VISUAL = "youtube_remember_visual_choice";
