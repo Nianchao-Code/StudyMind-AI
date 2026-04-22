@@ -239,6 +239,13 @@ def gemini_youtube_post(req: GeminiYoutubeRequest):
     if not key:
         raise HTTPException(500, "GEMINI_API_KEY not configured")
 
+    # Gemini's fileUri is strict: only a clean watch URL is accepted. Extra
+    # params like &t=, &list=, &si= trigger INVALID_ARGUMENT. Normalize first.
+    vid = extract_video_id(req.url)
+    if not vid:
+        raise HTTPException(400, "Could not parse a YouTube video id from the URL")
+    clean_url = f"https://www.youtube.com/watch?v={vid}"
+
     # Same prompt as SummarizationAgent.getVideoAnalysisPrompt() - must match transcript format
     prompt = (
         "You are StudyMind AI. Create EXAM-FOCUSED notes (key exam points + summary), NOT generic definitions. "
@@ -262,7 +269,7 @@ def gemini_youtube_post(req: GeminiYoutubeRequest):
     body = {
         "contents": [{
             "parts": [
-                {"fileData": {"fileUri": req.url, "mimeType": "video/mp4"}},
+                {"fileData": {"fileUri": clean_url, "mimeType": "video/mp4"}},
                 {"text": f"Video: {req.title or 'YouTube'}\n\n{prompt}"},
             ]
         }],
