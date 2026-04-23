@@ -177,7 +177,14 @@
         android:background="@color/leetcode_bg"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
         app:behavior_hideable="true"
-        app:behavior_peekHeight="0dp">
+        app:behavior_peekHeight="0dp"
+        app:behavior_fitToContents="false"
+        app:behavior_expandedOffset="80dp">
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -201,42 +208,49 @@
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnSurface" />
 
-            <!-- Quick question chips -->
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/quickQuestionChips"
+            <!-- Quick question chips (horizontal scroll so they don't get clipped) -->
+            <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                app:singleLine="true">
+                android:scrollbars="none"
+                android:fillViewport="false">
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipExplain"
-                    style="@style/Widget.MaterialComponents.Chip.Action"
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/quickQuestionChips"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Explain key concept" />
+                    app:singleLine="true">
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipQuiz"
-                    style="@style/Widget.MaterialComponents.Chip.Action"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Quiz me" />
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipExplain"
+                        style="@style/Widget.MaterialComponents.Chip.Action"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Explain key concept" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipPitfalls"
-                    style="@style/Widget.MaterialComponents.Chip.Action"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Common pitfalls" />
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipQuiz"
+                        style="@style/Widget.MaterialComponents.Chip.Action"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Quiz me" />
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipFlashcards"
-                    style="@style/Widget.MaterialComponents.Chip.Action"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Study deck" />
-            </com.google.android.material.chip.ChipGroup>
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipPitfalls"
+                        style="@style/Widget.MaterialComponents.Chip.Action"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Common pitfalls" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipFlashcards"
+                        style="@style/Widget.MaterialComponents.Chip.Action"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Study deck" />
+                </com.google.android.material.chip.ChipGroup>
+            </HorizontalScrollView>
 
             <!-- Custom question input -->
             <LinearLayout
@@ -303,7 +317,7 @@
                         android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
-                <ScrollView
+                <FrameLayout
                     android:id="@+id/answerScroll"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -315,7 +329,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:padding="0dp" />
-                </ScrollView>
+                </FrameLayout>
 
                 <TextView
                     android:id="@+id/answerText"
@@ -329,5 +343,6 @@
                     android:visibility="gone" />
             </FrameLayout>
         </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
     </FrameLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
